@@ -5,11 +5,101 @@
 
 #include <QtCore/QObject>
 
+class QFileCopierPrivate;
 class QFILECOPIERSHARED_EXPORT QFileCopier : public QObject
 {
     Q_OBJECT
+    Q_PROPERTY(int progressInterval READ progressInterval WRITE setProgressInterval)
+    Q_PROPERTY(bool autoReset READ autoReset WRITE setAutoReset)
 public:
     explicit QFileCopier(QObject *parent = 0);
+
+    enum State {
+        Idle,
+        Busy,
+        WaitingForInteraction
+    };
+
+    enum CopyFlag {
+        NonInteractive = 0x01,
+        Force = 0x02,
+        MakeLinks = 0x04,
+        FollowLinks = 0x08 // if not set links are copied
+    };
+
+    enum Error {
+        NoError,
+        SourceNotExists,
+        DestinationExists,
+        SourceDirectoryOmitted,
+        SourceFileOmitted,
+        PathToDestinationNotExists,
+        CannotCreateDestinationDirectory,
+        CannotOpenSourceFile,
+        CannotOpenDestinationFile,
+        CannotRemoveDestinationFile,
+        CannotCreateSymLink,
+        CannotReadSourceFile,
+        CannotWriteDestinationFile,
+        CannotRemoveSource,
+        Canceled
+    };
+
+    Q_DECLARE_FLAGS(CopyFlags, CopyFlag)
+
+    void copy(const QString &sourcePath, const QString &destinationPath, CopyFlags flags = 0);
+    void copy(const QStringList &sourcePaths, const QString &destinationPath, CopyFlags flags = 0);
+
+    void move(const QString &sourcePath, const QString &destinationPath, CopyFlags flags = 0);
+    void move(const QStringList &sourcePaths, const QString &destinationPath, CopyFlags flags = 0);
+
+    void link(const QString &sourcePath, const QString &destinationPath, CopyFlags flags = 0);
+    void link(const QStringList &sourcePaths, const QString &destinationPath, CopyFlags flags = 0);
+
+    QList<int> pendingRequests() const;
+    QString sourceFilePath(int id) const;
+    QString destinationFilePath(int id) const;
+    bool isDir(int id) const;
+    QList<int> entryList(int id) const;
+    int currentId() const;
+
+    State state() const;
+
+    void setAutoReset(bool on);
+    bool autoReset() const;
+    int progressInterval() const;
+    void setProgressInterval(int ms);
+
+public slots:
+    void cancelAll();
+    void cancel(int id);
+
+    void skip();
+    void skipAll();
+    void retry();
+
+    void overwrite();
+    void overwriteAll();
+
+    void reset();
+    void resetSkip();
+    void resetOverwrite();
+
+signals:
+    void error(int id, QFileCopier::Error error, bool stopped);
+
+    void stateChanged(QFileCopier::State state);
+
+    void done(bool error);
+    void started(int id);
+    void dataTransferProgress(int id, qint64 progress);
+    void finished(int id, bool error);
+    void canceled();
+
+private:
+    QFileCopierPrivate *d_ptr;
+    Q_DECLARE_PRIVATE(QFileCopier)
+    Q_DISABLE_COPY(QFileCopier)
 };
 
 #endif // QFILECOPIER_H
