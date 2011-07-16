@@ -42,12 +42,14 @@ signals:
 
 private:
     void updateRequest(::Request r);
-    int addFileToQueue(const ::Request &request);
-    int addDirToQueue(const ::Request &request);
+    int addFileToQueue(const ::Request &r);
+    int addDirToQueue(const ::Request &r);
+    void processRequest(const Request &r);
 
 private:
     mutable QMutex mutex;
     QQueue< ::Request > infoQueue;
+    int currentRequest;
     QList<Request> requestQueue;
 };
 

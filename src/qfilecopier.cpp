@@ -1,7 +1,8 @@
 #include "qfilecopier_p.h"
 
 QFileCopierThread::QFileCopierThread(QObject *parent) :
-    QThread(parent)
+    QThread(parent),
+    currentRequest(0)
 {
 }
 
@@ -10,7 +11,7 @@ void QFileCopierThread::copy(const QStringList &sourcePaths, const QString &dest
 {
     QMutexLocker l(&mutex);
     foreach (const QString &path, sourcePaths) {
-        Request r;
+        ::Request r;
         r.source = path;
         r.dest = destinationPath;
         r.copyFlags = flags;
@@ -29,6 +30,11 @@ void QFileCopierThread::run()
             ::Request r = infoQueue.takeFirst();
             mutex.unlock();
             updateRequest(r);
+        } else if (currentRequest < requestQueue.size()) {
+            processRequest(requestQueue.at(currentRequest));
+            currentRequest++;
+        } else {
+            stop = true;
         }
     }
 }
@@ -87,6 +93,22 @@ int QFileCopierThread::addDirToQueue(const::Request &request)
             r.childRequests.append(addFileToQueue(request));
     }
     return requestQueue.size();
+}
+
+void QFileCopierThread::processRequest(const QFileCopierThread::Request &r)
+{
+    if (r.isDir) {
+        QDir().mkpath(r.dest);
+    } else {
+        QFile s(r.source);
+        s.open(QFile::ReadOnly);
+        QFile d(r.dest);
+        d.open(QFile::WriteOnly);
+        while (!s.atEnd()) {
+            QByteArray chunk = s.read(1024);
+            d.write(chunk);
+        }
+    }
 }
 
 /*!
