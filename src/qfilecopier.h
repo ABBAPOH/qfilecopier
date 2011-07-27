@@ -54,8 +54,8 @@ public:
 //    void move(const QString &sourcePath, const QString &destinationPath, CopyFlags flags = 0);
 //    void move(const QStringList &sourcePaths, const QString &destinationPath, CopyFlags flags = 0);
 
-//    void link(const QString &sourcePath, const QString &destinationPath, CopyFlags flags = 0);
-//    void link(const QStringList &sourcePaths, const QString &destinationPath, CopyFlags flags = 0);
+//    void remove(const QString &sourcePath, CopyFlags flags = 0);
+//    void remove(const QStringList &sourcePath, CopyFlags flags = 0);
 
 //    QList<int> pendingRequests() const;
 //    QString sourceFilePath(int id) const;
@@ -85,6 +85,9 @@ public slots:
 //    void reset();
 //    void resetSkip();
 //    void resetOverwrite();
+
+//    void merge();
+//    void mergeAll();
 
 //signals:
 //    void error(int id, QFileCopier::Error error, bool stopped);
