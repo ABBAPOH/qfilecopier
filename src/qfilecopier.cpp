@@ -1,5 +1,8 @@
 #include "qfilecopier_p.h"
 
+#include <QCoreApplication>
+#include <QDebug>
+
 QFileCopierThread::QFileCopierThread(QObject *parent) :
     QThread(parent),
     currentRequest(0)
@@ -9,14 +12,16 @@ QFileCopierThread::QFileCopierThread(QObject *parent) :
 void QFileCopierThread::copy(const QStringList &sourcePaths, const QString &destinationPath,
                              QFileCopier::CopyFlags flags)
 {
-    QMutexLocker l(&mutex);
+    QList< Task > requests;
     foreach (const QString &path, sourcePaths) {
-        ::Request r;
+        Task r;
         r.source = path;
         r.dest = destinationPath;
         r.copyFlags = flags;
-        infoQueue.append(r);
+        requests.append(r);
     }
+    QMutexLocker l(&mutex);
+    infoQueue.append(requests);
 }
 
 void QFileCopierThread::run()
@@ -27,11 +32,12 @@ void QFileCopierThread::run()
         if (!infoQueue.isEmpty()) {
             // setState(gathering)
             mutex.lock();
-            ::Request r = infoQueue.takeFirst();
+            Task r = infoQueue.takeFirst();
             mutex.unlock();
             updateRequest(r);
+            // todo: use second queue
         } else if (currentRequest < requestQueue.size()) {
-            processRequest(requestQueue.at(currentRequest));
+            processRequest(currentRequest);
             currentRequest++;
         } else {
             stop = true;
@@ -39,24 +45,23 @@ void QFileCopierThread::run()
     }
 }
 
-void QFileCopierThread::updateRequest(::Request r)
+void QFileCopierThread::updateRequest(Task r)
 {
-    Request result;
-    result.source = r.source;
-    result.copyFlags = r.copyFlags;
-
     QFileInfo sourceInfo(r.source);
     QFileInfo destInfo(r.dest);
     if (destInfo.exists() && destInfo.isDir())
         r.dest = r.dest + QDir::separator() + sourceInfo.fileName();
+    // todo: fix / at end of non-existing path
 
+    int index = -1;
     if (sourceInfo.isDir())
-        addDirToQueue(r);
+        index = addDirToQueue(r);
     else
-        addFileToQueue(r);
+        index = addFileToQueue(r);
+//    copyQueue.append(index);
 }
 
-int QFileCopierThread::addFileToQueue(const ::Request & request)
+int QFileCopierThread::addFileToQueue(const Task & request)
 {
     Request r;
     r.type = request.type;
@@ -68,7 +73,7 @@ int QFileCopierThread::addFileToQueue(const ::Request & request)
     return requestQueue.size();
 }
 
-int QFileCopierThread::addDirToQueue(const::Request &request)
+int QFileCopierThread::addDirToQueue(const Task &request)
 {
     Request r;
     r.type = request.type;
@@ -77,38 +82,63 @@ int QFileCopierThread::addDirToQueue(const::Request &request)
     r.copyFlags = request.copyFlags;
     r.isDir = true;
     requestQueue.append(r);
+    int id = requestQueue.size();
 
     QDirIterator i(r.source, QDir::AllEntries | QDir::NoDotAndDotDot);
     while (i.hasNext()) {
         QString source = i.next();
         QFileInfo sourceInfo(source);
-        ::Request request;
+        Task request;
         request.type = r.type;
         request.source = source;
         request.dest = r.dest + QDir::separator() + sourceInfo.fileName();
         request.copyFlags = r.copyFlags;
         if (sourceInfo.isDir())
-            r.childRequests.append(addDirToQueue(request));
+            requestQueue[id].childRequests.append(addDirToQueue(request));
         else
-            r.childRequests.append(addFileToQueue(request));
+            requestQueue[id].childRequests.append(addFileToQueue(request));
     }
     return requestQueue.size();
 }
 
-void QFileCopierThread::processRequest(const QFileCopierThread::Request &r)
+void QFileCopierThread::processRequest(int id)
 {
+    emit started(id);
+    const Request &r = requestQueue.at(id);
+
+    currentRequest = id;
     if (r.isDir) {
-        QDir().mkpath(r.dest);
+        QDir().mkpath(r.dest); // check
+        foreach (int id, r.childRequests) {
+            processRequest(id);
+        }
     } else {
         QFile s(r.source);
-        s.open(QFile::ReadOnly);
+        s.open(QFile::ReadOnly); // check if opened
         QFile d(r.dest);
         d.open(QFile::WriteOnly);
         while (!s.atEnd()) {
+            // todo: buffersize + char buffer
+            // check error while reading
             QByteArray chunk = s.read(1024);
             d.write(chunk);
+//            if (shouldEmit)
+//                emit progress(currentWritten);
         }
     }
+    emit finished(id);
+}
+
+void QFileCopierPrivate::onStarted(int id)
+{
+    currentRequests.append(id);
+    qDebug() << "started id" << id << QThread::currentThread() << qApp->thread();
+}
+
+void QFileCopierPrivate::onFinished(int id)
+{
+    qDebug() << "finished id" << id << QThread::currentThread() << qApp->thread();
+    currentRequests.pop();
 }
 
 /*!
@@ -123,6 +153,8 @@ QFileCopier::QFileCopier(QObject *parent) :
     Q_D(QFileCopier);
 
     d->thread = new QFileCopierThread(this);
+    connect(d->thread, SIGNAL(started(int)), d, SLOT(onStarted(int)));
+    connect(d->thread, SIGNAL(finished(int)), d, SLOT(onFinished(int)));
     d->thread->start();
 }
 

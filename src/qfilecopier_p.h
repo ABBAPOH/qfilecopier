@@ -8,9 +8,10 @@
 #include <QtCore/QFileInfo>
 #include <QtCore/QMutex>
 #include <QtCore/QQueue>
+#include <QtCore/QStack>
 #include <QtCore/QThread>
 
-struct Request
+struct Task
 {
     enum Type { Copy, Move, Link };
 
@@ -20,16 +21,17 @@ struct Request
     QFileCopier::CopyFlags copyFlags;
 };
 
+struct Request : public Task
+{
+    bool isDir;
+    QList<int> childRequests;
+};
+
 class QFileCopierThread : public QThread
 {
     Q_OBJECT
 
 public:
-    struct Request : public ::Request
-    {
-        bool isDir;
-        QList<int> childRequests;
-    };
 
     explicit QFileCopierThread(QObject *parent = 0);
 
@@ -39,22 +41,25 @@ protected:
     void run();
 
 signals:
+    void started(int);
+    void finished(int);
 
 private:
-    void updateRequest(::Request r);
-    int addFileToQueue(const ::Request &r);
-    int addDirToQueue(const ::Request &r);
-    void processRequest(const Request &r);
+    void updateRequest(Task r);
+    int addFileToQueue(const Task &r);
+    int addDirToQueue(const Task &r);
+    void processRequest(int id);
 
 private:
     mutable QMutex mutex;
-    QQueue< ::Request > infoQueue;
+    QQueue< Task > infoQueue;
     int currentRequest;
     QList<Request> requestQueue;
 };
 
-class QFileCopierPrivate
+class QFileCopierPrivate : public QObject
 {
+    Q_OBJECT
     Q_DECLARE_PUBLIC(QFileCopier)
 
 public:
@@ -62,7 +67,13 @@ public:
 
     QFileCopierThread *thread;
 
+public slots:
+    void onStarted(int);
+    void onFinished(int);
+
 private:
+    QStack<int> currentRequests;
+
     QFileCopier *q_ptr;
 };
 
