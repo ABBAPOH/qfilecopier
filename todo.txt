@@ -1,0 +1,7 @@
+- Explore how QFile::link works on different OS
+- Move, Remove (and Link?) operations
+- CopyFlags
+- State and Stage API
+- Notification signals
+- Error handling
+- Other API
