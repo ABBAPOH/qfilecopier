@@ -21,6 +21,12 @@ public:
         WaitingForInteraction
     };
 
+    enum Stage {
+        NoStage,
+        Gathering,
+        Working
+    };
+
     enum CopyFlag {
         NonInteractive = 0x01,
         Force = 0x02,
@@ -49,13 +55,16 @@ public:
     Q_DECLARE_FLAGS(CopyFlags, CopyFlag)
 
     void copy(const QString &sourcePath, const QString &destinationPath, CopyFlags flags = 0);
-//    void copy(const QStringList &sourcePaths, const QString &destinationPath, CopyFlags flags = 0);
+    void copy(const QStringList &sourcePaths, const QString &destinationPath, CopyFlags flags = 0);
 
-//    void move(const QString &sourcePath, const QString &destinationPath, CopyFlags flags = 0);
-//    void move(const QStringList &sourcePaths, const QString &destinationPath, CopyFlags flags = 0);
+//    void link(const QString &sourcePath, CopyFlags flags = 0);
+//    void link(const QStringList &sourcePath, CopyFlags flags = 0);
 
-//    void remove(const QString &sourcePath, CopyFlags flags = 0);
-//    void remove(const QStringList &sourcePath, CopyFlags flags = 0);
+    void move(const QString &sourcePath, const QString &destinationPath, CopyFlags flags = 0);
+    void move(const QStringList &sourcePaths, const QString &destinationPath, CopyFlags flags = 0);
+
+    void remove(const QString &path, CopyFlags flags = 0);
+    void remove(const QStringList &paths, CopyFlags flags = 0);
 
 //    QList<int> pendingRequests() const;
 //    QString sourceFilePath(int id) const;

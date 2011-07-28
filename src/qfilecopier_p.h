@@ -14,7 +14,7 @@
 
 struct Task
 {
-    enum Type { Copy, Move, Link };
+    enum Type { Copy, Move, Remove, Link };
 
     Type type;
     QString source;
@@ -33,10 +33,9 @@ class QFileCopierThread : public QThread
     Q_OBJECT
 
 public:
-
     explicit QFileCopierThread(QObject *parent = 0);
 
-    void copy(const QStringList &sourcePaths, const QString &destinationPath, QFileCopier::CopyFlags flags);
+    void enqueueTaskList(const QList<Task> &list);
 
 protected:
     void run();
@@ -67,6 +66,9 @@ public:
     QFileCopierPrivate(QFileCopier *qq) : q_ptr(qq) {}
 
     QFileCopierThread *thread;
+
+    void enqueueOperation(Task::Type operationType, const QStringList &sourcePaths,
+                          const QString &destinationPath, QFileCopier::CopyFlags flags);
 
 public slots:
     void onStarted(int);

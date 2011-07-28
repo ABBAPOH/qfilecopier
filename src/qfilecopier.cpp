@@ -9,19 +9,10 @@ QFileCopierThread::QFileCopierThread(QObject *parent) :
 {
 }
 
-void QFileCopierThread::copy(const QStringList &sourcePaths, const QString &destinationPath,
-                             QFileCopier::CopyFlags flags)
+void QFileCopierThread::enqueueTaskList(const QList<Task> &list)
 {
-    QList< Task > requests;
-    foreach (const QString &path, sourcePaths) {
-        Task r;
-        r.source = path;
-        r.dest = destinationPath;
-        r.copyFlags = flags;
-        requests.append(r);
-    }
     QWriteLocker l(&lock);
-    infoQueue.append(requests);
+    infoQueue.append(list);
 }
 
 void QFileCopierThread::run()
@@ -129,6 +120,23 @@ void QFileCopierThread::processRequest(int id)
     emit finished(id);
 }
 
+
+void QFileCopierPrivate::enqueueOperation(Task::Type operationType, const QStringList &sourcePaths,
+                                          const QString &destinationPath, QFileCopier::CopyFlags flags)
+{
+    QList<Task> taskList;
+    taskList.reserve(sourcePaths.size());
+    foreach (const QString &path, sourcePaths) {
+        Task t;
+        t.source = path;
+        t.dest = destinationPath;
+        t.copyFlags = flags;
+        t.type = operationType;
+        taskList.append(t);
+    }
+    thread->enqueueTaskList(taskList);
+}
+
 void QFileCopierPrivate::onStarted(int id)
 {
     currentRequests.append(id);
@@ -165,5 +173,31 @@ QFileCopier::~QFileCopier()
 
 void QFileCopier::copy(const QString &sourcePath, const QString &destinationPath, CopyFlags flags)
 {
-    d_func()->thread->copy(QStringList() << sourcePath, destinationPath, flags);
+    copy(QStringList() << sourcePath, destinationPath, flags);
 }
+
+void QFileCopier::copy(const QStringList &sourcePaths, const QString &destinationPath, CopyFlags flags)
+{
+    d_func()->enqueueOperation(Task::Copy, sourcePaths, destinationPath, flags);
+}
+
+void QFileCopier::move(const QString &sourcePath, const QString &destinationPath, CopyFlags flags)
+{
+    move(QStringList() << sourcePath, destinationPath, flags);
+}
+
+void QFileCopier::move(const QStringList &sourcePaths, const QString &destinationPath, CopyFlags flags)
+{
+    d_func()->enqueueOperation(Task::Move, sourcePaths, destinationPath, flags);
+}
+
+void QFileCopier::remove(const QString &path, CopyFlags flags)
+{
+    remove(QStringList() << path, flags);
+}
+
+void QFileCopier::remove(const QStringList &paths, CopyFlags flags)
+{
+    d_func()->enqueueOperation(Task::Remove, paths, QString(), flags);
+}
+
