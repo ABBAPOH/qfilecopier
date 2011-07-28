@@ -7,6 +7,7 @@
 #include <QtCore/QDirIterator>
 #include <QtCore/QFileInfo>
 #include <QtCore/QMutex>
+#include <QtCore/QReadWriteLock>
 #include <QtCore/QQueue>
 #include <QtCore/QStack>
 #include <QtCore/QThread>
@@ -51,7 +52,7 @@ private:
     void processRequest(int id);
 
 private:
-    mutable QMutex mutex;
+    mutable QReadWriteLock lock;
     QQueue< Task > infoQueue;
     int currentRequest;
     QList<Request> requestQueue;

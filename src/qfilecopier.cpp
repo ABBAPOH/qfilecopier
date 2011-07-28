@@ -20,7 +20,7 @@ void QFileCopierThread::copy(const QStringList &sourcePaths, const QString &dest
         r.copyFlags = flags;
         requests.append(r);
     }
-    QMutexLocker l(&mutex);
+    QWriteLocker l(&lock);
     infoQueue.append(requests);
 }
 
@@ -31,9 +31,9 @@ void QFileCopierThread::run()
     while (!stop) {
         if (!infoQueue.isEmpty()) {
             // setState(gathering)
-            mutex.lock();
+            lock.lockForWrite();
             Task r = infoQueue.takeFirst();
-            mutex.unlock();
+            lock.unlock();
             updateRequest(r);
             // todo: use second queue
         } else if (currentRequest < requestQueue.size()) {
