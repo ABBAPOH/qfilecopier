@@ -5,14 +5,14 @@
 
 QFileCopierThread::QFileCopierThread(QObject *parent) :
     QThread(parent),
-    currentRequest(0)
+    lock(QReadWriteLock::Recursive)
 {
 }
 
 void QFileCopierThread::enqueueTaskList(const QList<Task> &list)
 {
     QWriteLocker l(&lock);
-    infoQueue.append(list);
+    taskQueue.append(list);
 }
 
 void QFileCopierThread::run()
@@ -20,84 +20,100 @@ void QFileCopierThread::run()
     bool stop = false;
 
     while (!stop) {
-        if (!infoQueue.isEmpty()) {
+        if (!taskQueue.isEmpty()) {
             // setState(gathering)
             lock.lockForWrite();
-            Task r = infoQueue.takeFirst();
+            Task r = taskQueue.takeFirst();
             lock.unlock();
+
             updateRequest(r);
             // todo: use second queue
-        } else if (currentRequest < requestQueue.size()) {
-            processRequest(currentRequest);
-            currentRequest++;
+        } else if (requestQueue.isEmpty()) {
+            int id = requestQueue.takeFirst(); // inner queue, no lock
+            processRequest(id);
         } else {
             stop = true;
         }
     }
 }
 
-void QFileCopierThread::updateRequest(Task r)
+void QFileCopierThread::updateRequest(Task t)
 {
-    QFileInfo sourceInfo(r.source);
-    QFileInfo destInfo(r.dest);
+    QFileInfo sourceInfo(t.source);
+    QFileInfo destInfo(t.dest);
     if (destInfo.exists() && destInfo.isDir())
-        r.dest = r.dest + QDir::separator() + sourceInfo.fileName();
+        t.dest = QDir::fromNativeSeparators(t.dest) + "/" + sourceInfo.fileName();
+    else
+        t.dest = QDir::fromNativeSeparators(t.dest);
     // todo: fix / at end of non-existing path
 
     int index = -1;
     if (sourceInfo.isDir())
-        index = addDirToQueue(r);
+        index = addDirToQueue(t);
     else
-        index = addFileToQueue(r);
-//    copyQueue.append(index);
+        index = addFileToQueue(t);
+    requestQueue.append(index);
 }
 
-int QFileCopierThread::addFileToQueue(const Task & request)
+int QFileCopierThread::addFileToQueue(const Task & task)
 {
     Request r;
-    r.type = request.type;
-    r.source = request.source;
-    r.dest = request.dest;
-    r.copyFlags = request.copyFlags;
+    r.type = task.type;
+    r.source = task.source;
+    r.dest = task.dest;
+    r.copyFlags = task.copyFlags;
     r.isDir = false;
-    requestQueue.append(r);
-    return requestQueue.size();
+
+    QWriteLocker l(&lock);
+    requests.append(r);
+    return requests.size();
 }
 
-int QFileCopierThread::addDirToQueue(const Task &request)
+int QFileCopierThread::addDirToQueue(const Task &task)
 {
     Request r;
-    r.type = request.type;
-    r.source = request.source;
-    r.dest = request.dest;
-    r.copyFlags = request.copyFlags;
+    r.type = task.type;
+    r.source = task.source;
+    r.dest = task.dest;
+    r.copyFlags = task.copyFlags;
     r.isDir = true;
-    requestQueue.append(r);
-    int id = requestQueue.size();
+
+    lock.lockForWrite();
+    requests.append(r);
+    int id = requests.size();
+    lock.unlock();
+
+    QList<int> childRequests;
 
     QDirIterator i(r.source, QDir::AllEntries | QDir::NoDotAndDotDot);
     while (i.hasNext()) {
         QString source = i.next();
         QFileInfo sourceInfo(source);
-        Task request;
-        request.type = r.type;
-        request.source = source;
-        request.dest = r.dest + QDir::separator() + sourceInfo.fileName();
-        request.copyFlags = r.copyFlags;
+
+        Task t;
+        t.type = r.type;
+        t.source = source;
+        t.dest = r.dest + "/" + sourceInfo.fileName();
+        t.copyFlags = r.copyFlags;
+
         if (sourceInfo.isDir())
-            requestQueue[id].childRequests.append(addDirToQueue(request));
+            childRequests.append(addDirToQueue(t));
         else
-            requestQueue[id].childRequests.append(addFileToQueue(request));
+            childRequests.append(addFileToQueue(t));
     }
-    return requestQueue.size();
+
+//    QWriteLocker l(&lock); // i think no need as QList hac atomic int within
+    requests[id].childRequests = childRequests;
+
+    return id;
 }
 
 void QFileCopierThread::processRequest(int id)
 {
     emit started(id);
-    const Request &r = requestQueue.at(id);
 
-    currentRequest = id;
+    const Request &r = requests.at(id);
+
     if (r.isDir) {
         QDir().mkpath(r.dest); // check
         foreach (int id, r.childRequests) {

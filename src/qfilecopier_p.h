@@ -52,9 +52,9 @@ private:
 
 private:
     mutable QReadWriteLock lock;
-    QQueue< Task > infoQueue;
-    int currentRequest;
-    QList<Request> requestQueue;
+    QQueue<Task> taskQueue;
+    QQueue<int> requestQueue;
+    QList<Request> requests;
 };
 
 class QFileCopierPrivate : public QObject
