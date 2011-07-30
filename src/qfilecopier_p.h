@@ -37,10 +37,14 @@ public:
 
     void enqueueTaskList(const QList<Task> &list);
 
+    QFileCopier::Stage stage() const;
+    void setStage(QFileCopier::Stage);
+
 protected:
     void run();
 
 signals:
+    void stageChanged(QFileCopier::Stage);
     void started(int);
     void finished(int);
 
@@ -55,6 +59,8 @@ private:
     QQueue<Task> taskQueue;
     QQueue<int> requestQueue;
     QList<Request> requests;
+
+    volatile QFileCopier::Stage m_stage;
 };
 
 class QFileCopierPrivate : public QObject

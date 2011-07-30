@@ -7,12 +7,24 @@ QFileCopierThread::QFileCopierThread(QObject *parent) :
     QThread(parent),
     lock(QReadWriteLock::Recursive)
 {
+    m_stage = QFileCopier::NoStage;
 }
 
 void QFileCopierThread::enqueueTaskList(const QList<Task> &list)
 {
     QWriteLocker l(&lock);
     taskQueue.append(list);
+}
+
+QFileCopier::Stage QFileCopierThread::stage() const
+{
+    return m_stage;
+}
+
+void QFileCopierThread::setStage(QFileCopier::Stage stage)
+{
+    m_stage = stage;
+    emit stageChanged(m_stage);
 }
 
 void QFileCopierThread::run()
@@ -23,7 +35,7 @@ void QFileCopierThread::run()
 
         lock.lockForWrite();
         if (!taskQueue.isEmpty()) {
-            // setStage(Gathering)
+            setStage(QFileCopier::Gathering);
             Task t = taskQueue.takeFirst();
             lock.unlock();
 
@@ -33,14 +45,15 @@ void QFileCopierThread::run()
         }
 
         if (requestQueue.isEmpty()) {
-            // setStage(Working)
+            setStage(QFileCopier::Working);
             int id = requestQueue.takeFirst(); // inner queue, no lock
             processRequest(id);
         } else {
             stop = true;
         }
-
     }
+
+    setStage(QFileCopier::NoStage);
 }
 
 void QFileCopierThread::createRequest(Task t)
@@ -183,6 +196,7 @@ QFileCopier::QFileCopier(QObject *parent) :
     Q_D(QFileCopier);
 
     d->thread = new QFileCopierThread(this);
+    connect(d->thread, SIGNAL(stageChanged(QFileCopier::Stage)), d, SLOT(stageChanged(QFileCopier::Stage)));
     connect(d->thread, SIGNAL(started(int)), d, SLOT(onStarted(int)));
     connect(d->thread, SIGNAL(finished(int)), d, SLOT(onFinished(int)));
     d->thread->start();
@@ -202,7 +216,6 @@ void QFileCopier::copy(const QStringList &sourcePaths, const QString &destinatio
 {
     d_func()->enqueueOperation(Task::Copy, sourcePaths, destinationPath, flags);
 }
-
 
 void QFileCopier::link(const QString &sourcePath, const QString &destinationPath, CopyFlags flags)
 {
@@ -234,3 +247,7 @@ void QFileCopier::remove(const QStringList &paths, CopyFlags flags)
     d_func()->enqueueOperation(Task::Remove, paths, QString(), flags);
 }
 
+QFileCopier::Stage QFileCopier::stage() const
+{
+    return d_func()->thread->stage();
+}

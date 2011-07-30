@@ -74,6 +74,7 @@ public:
 //    int currentId() const;
 
 //    State state() const;
+    Stage stage() const;
 
 //    void setAutoReset(bool on);
 //    bool autoReset() const;
@@ -98,10 +99,11 @@ public slots:
 //    void merge();
 //    void mergeAll();
 
-//signals:
+signals:
 //    void error(int id, QFileCopier::Error error, bool stopped);
 
 //    void stateChanged(QFileCopier::State state);
+    void stageChanged(QFileCopier::Stage);
 
 //    void done(bool error);
 //    void started(int id);
