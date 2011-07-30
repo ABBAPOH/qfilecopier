@@ -32,13 +32,18 @@ class QFileCopierThread : public QThread
 {
     Q_OBJECT
 
+    typedef QFileCopier::Stage Stage;
+    Q_ENUMS(QFileCopier::Stage)
 public:
     explicit QFileCopierThread(QObject *parent = 0);
+    ~QFileCopierThread();
 
     void enqueueTaskList(const QList<Task> &list);
 
     QFileCopier::Stage stage() const;
     void setStage(QFileCopier::Stage);
+
+    Request request(int id) const;
 
 protected:
     void run();
@@ -90,5 +95,6 @@ private:
 
     QFileCopier *q_ptr;
 };
+
 
 #endif // QFILECOPIER_P_H

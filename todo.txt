@@ -1,7 +1,6 @@
-- Explore how QFile::link works on different OS
+- Building request tree bug (if dest param has '/ at end)
 - Move, Remove (and Link?) operations
 - CopyFlags
-- State and Stage API
-- Notification signals
+- Progress signals
 - Error handling
 - Other API

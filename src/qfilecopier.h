@@ -20,12 +20,14 @@ public:
         Busy,
         WaitingForInteraction
     };
+    Q_ENUMS(State)
 
     enum Stage {
         NoStage,
         Gathering,
         Working
     };
+    Q_ENUMS(Stage)
 
     enum CopyFlag {
         NonInteractive = 0x01,
@@ -67,8 +69,8 @@ public:
     void remove(const QStringList &paths, CopyFlags flags = 0);
 
 //    QList<int> pendingRequests() const;
-//    QString sourceFilePath(int id) const;
-//    QString destinationFilePath(int id) const;
+    QString sourceFilePath(int id) const;
+    QString destinationFilePath(int id) const;
 //    bool isDir(int id) const;
 //    QList<int> entryList(int id) const;
 //    int currentId() const;
@@ -102,13 +104,13 @@ public slots:
 signals:
 //    void error(int id, QFileCopier::Error error, bool stopped);
 
-    void stateChanged(QFileCopier::State state);
+    void stateChanged(QFileCopier::State);
     void stageChanged(QFileCopier::Stage);
 
 //    void done(bool error);
-//    void started(int id);
+    void started(int id);
 //    void dataTransferProgress(int id, qint64 progress);
-//    void finished(int id, bool error);
+    void finished(int id, bool error);
 //    void canceled();
 
 private:

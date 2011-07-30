@@ -1,13 +1,22 @@
 #include "qfilecopier_p.h"
 
-#include <QCoreApplication>
+#include <QtCore/QCoreApplication>
+#include <QtCore/QMetaType>
+
 #include <QDebug>
+
+Q_DECLARE_METATYPE(QFileCopier::Stage)
 
 QFileCopierThread::QFileCopierThread(QObject *parent) :
     QThread(parent),
     lock(QReadWriteLock::Recursive)
 {
     m_stage = QFileCopier::NoStage;
+}
+
+QFileCopierThread::~QFileCopierThread()
+{
+    wait();
 }
 
 void QFileCopierThread::enqueueTaskList(const QList<Task> &list)
@@ -27,6 +36,12 @@ void QFileCopierThread::setStage(QFileCopier::Stage stage)
     emit stageChanged(m_stage);
 }
 
+Request QFileCopierThread::request(int id) const
+{
+    QReadLocker l(&lock);
+    return requests.at(id);
+}
+
 void QFileCopierThread::run()
 {
     bool stop = false;
@@ -44,7 +59,7 @@ void QFileCopierThread::run()
             lock.unlock();
         }
 
-        if (requestQueue.isEmpty()) {
+        if (!requestQueue.isEmpty()) {
             setStage(QFileCopier::Working);
             int id = requestQueue.takeFirst(); // inner queue, no lock
             processRequest(id);
@@ -61,10 +76,9 @@ void QFileCopierThread::createRequest(Task t)
     QFileInfo sourceInfo(t.source);
     QFileInfo destInfo(t.dest);
     if (destInfo.exists() && destInfo.isDir())
-        t.dest = QDir::fromNativeSeparators(t.dest) + "/" + sourceInfo.fileName();
-    else
-        t.dest = QDir::fromNativeSeparators(t.dest);
-    // todo: fix / at end of non-existing path
+        t.dest = destInfo.absolutePath() + "/" + sourceInfo.fileName();
+
+    t.dest = QDir::cleanPath(t.dest);
 
     int index = -1;
     if (sourceInfo.isDir())
@@ -84,8 +98,9 @@ int QFileCopierThread::addFileToQueue(const Task & task)
     r.isDir = false;
 
     QWriteLocker l(&lock);
+    int id = requests.size();
     requests.append(r);
-    return requests.size();
+    return id;
 }
 
 int QFileCopierThread::addDirToQueue(const Task &task)
@@ -98,8 +113,8 @@ int QFileCopierThread::addDirToQueue(const Task &task)
     r.isDir = true;
 
     lock.lockForWrite();
-    requests.append(r);
     int id = requests.size();
+    requests.append(r);
     lock.unlock();
 
     QList<int> childRequests;
@@ -184,13 +199,13 @@ void QFileCopierPrivate::startThread()
 void QFileCopierPrivate::onStarted(int id)
 {
     currentRequests.append(id);
-    qDebug() << "started id" << id << QThread::currentThread() << qApp->thread();
+    emit q_func()->started(id);
 }
 
 void QFileCopierPrivate::onFinished(int id)
 {
-    qDebug() << "finished id" << id << QThread::currentThread() << qApp->thread();
     currentRequests.pop();
+    emit q_func()->finished(id, false);
 }
 
 void QFileCopierPrivate::onThreadFinished()
@@ -209,8 +224,10 @@ QFileCopier::QFileCopier(QObject *parent) :
 {
     Q_D(QFileCopier);
 
+    qRegisterMetaType <QFileCopier::Stage> ("QFileCopier::Stage");
+
     d->thread = new QFileCopierThread(this);
-    connect(d->thread, SIGNAL(stageChanged(QFileCopier::Stage)), d, SLOT(stageChanged(QFileCopier::Stage)));
+    connect(d->thread, SIGNAL(stageChanged(QFileCopier::Stage)), SIGNAL(stageChanged(QFileCopier::Stage)));
     connect(d->thread, SIGNAL(started(int)), d, SLOT(onStarted(int)));
     connect(d->thread, SIGNAL(finished(int)), d, SLOT(onFinished(int)));
     connect(d->thread, SIGNAL(finished()), d, SLOT(onThreadFinished()));
@@ -260,6 +277,16 @@ void QFileCopier::remove(const QString &path, CopyFlags flags)
 void QFileCopier::remove(const QStringList &paths, CopyFlags flags)
 {
     d_func()->enqueueOperation(Task::Remove, paths, QString(), flags);
+}
+
+QString QFileCopier::sourceFilePath(int id) const
+{
+    return d_func()->thread->request(id).source;
+}
+
+QString QFileCopier::destinationFilePath(int id) const
+{
+    return d_func()->thread->request(id).dest;
 }
 
 QFileCopier::Stage QFileCopier::stage() const
