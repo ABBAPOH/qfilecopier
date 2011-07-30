@@ -20,27 +20,30 @@ void QFileCopierThread::run()
     bool stop = false;
 
     while (!stop) {
+
         lock.lockForWrite();
         if (!taskQueue.isEmpty()) {
-            // setState(gathering)
-            Task r = taskQueue.takeFirst();
+            // setStage(Gathering)
+            Task t = taskQueue.takeFirst();
             lock.unlock();
 
-            updateRequest(r);
-            // todo: use second queue
+            createRequest(t);
         } else {
             lock.unlock();
         }
+
         if (requestQueue.isEmpty()) {
+            // setStage(Working)
             int id = requestQueue.takeFirst(); // inner queue, no lock
             processRequest(id);
         } else {
             stop = true;
         }
+
     }
 }
 
-void QFileCopierThread::updateRequest(Task t)
+void QFileCopierThread::createRequest(Task t)
 {
     QFileInfo sourceInfo(t.source);
     QFileInfo destInfo(t.dest);

@@ -45,7 +45,7 @@ signals:
     void finished(int);
 
 private:
-    void updateRequest(Task r);
+    void createRequest(Task r);
     int addFileToQueue(const Task &r);
     int addDirToQueue(const Task &r);
     void processRequest(int id);
