@@ -200,6 +200,17 @@ void QFileCopier::copy(const QStringList &sourcePaths, const QString &destinatio
     d_func()->enqueueOperation(Task::Copy, sourcePaths, destinationPath, flags);
 }
 
+
+void QFileCopier::link(const QString &sourcePath, const QString &destinationPath, CopyFlags flags)
+{
+    link(QStringList() << sourcePath, destinationPath, flags);
+}
+
+void QFileCopier::link(const QStringList &sourcePaths, const QString &destinationPath, CopyFlags flags)
+{
+    d_func()->enqueueOperation(Task::Link, sourcePaths, destinationPath, flags);
+}
+
 void QFileCopier::move(const QString &sourcePath, const QString &destinationPath, CopyFlags flags)
 {
     move(QStringList() << sourcePath, destinationPath, flags);

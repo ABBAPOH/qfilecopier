@@ -57,8 +57,8 @@ public:
     void copy(const QString &sourcePath, const QString &destinationPath, CopyFlags flags = 0);
     void copy(const QStringList &sourcePaths, const QString &destinationPath, CopyFlags flags = 0);
 
-//    void link(const QString &sourcePath, CopyFlags flags = 0);
-//    void link(const QStringList &sourcePath, CopyFlags flags = 0);
+    void link(const QString &sourcePath, const QString &destinationPath, CopyFlags flags = 0);
+    void link(const QStringList &sourcePaths, const QString &destinationPath, CopyFlags flags = 0);
 
     void move(const QString &sourcePath, const QString &destinationPath, CopyFlags flags = 0);
     void move(const QStringList &sourcePaths, const QString &destinationPath, CopyFlags flags = 0);
