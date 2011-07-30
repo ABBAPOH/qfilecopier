@@ -20,15 +20,18 @@ void QFileCopierThread::run()
     bool stop = false;
 
     while (!stop) {
+        lock.lockForWrite();
         if (!taskQueue.isEmpty()) {
             // setState(gathering)
-            lock.lockForWrite();
             Task r = taskQueue.takeFirst();
             lock.unlock();
 
             updateRequest(r);
             // todo: use second queue
-        } else if (requestQueue.isEmpty()) {
+        } else {
+            lock.unlock();
+        }
+        if (requestQueue.isEmpty()) {
             int id = requestQueue.takeFirst(); // inner queue, no lock
             processRequest(id);
         } else {
