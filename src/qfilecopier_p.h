@@ -72,13 +72,18 @@ public:
     QFileCopierPrivate(QFileCopier *qq) : q_ptr(qq) {}
 
     QFileCopierThread *thread;
+    QFileCopier::State state;
 
     void enqueueOperation(Task::Type operationType, const QStringList &sourcePaths,
                           const QString &destinationPath, QFileCopier::CopyFlags flags);
+    void startThread();
+
+    void setState(QFileCopier::State s);
 
 public slots:
     void onStarted(int);
     void onFinished(int);
+    void onThreadFinished();
 
 private:
     QStack<int> currentRequests;

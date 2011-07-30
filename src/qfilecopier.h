@@ -73,7 +73,7 @@ public:
 //    QList<int> entryList(int id) const;
 //    int currentId() const;
 
-//    State state() const;
+    State state() const;
     Stage stage() const;
 
 //    void setAutoReset(bool on);
@@ -102,7 +102,7 @@ public slots:
 signals:
 //    void error(int id, QFileCopier::Error error, bool stopped);
 
-//    void stateChanged(QFileCopier::State state);
+    void stateChanged(QFileCopier::State state);
     void stageChanged(QFileCopier::Stage);
 
 //    void done(bool error);

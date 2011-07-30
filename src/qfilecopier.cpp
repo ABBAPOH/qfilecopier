@@ -155,7 +155,6 @@ void QFileCopierThread::processRequest(int id)
     emit finished(id);
 }
 
-
 void QFileCopierPrivate::enqueueOperation(Task::Type operationType, const QStringList &sourcePaths,
                                           const QString &destinationPath, QFileCopier::CopyFlags flags)
 {
@@ -170,6 +169,16 @@ void QFileCopierPrivate::enqueueOperation(Task::Type operationType, const QStrin
         taskList.append(t);
     }
     thread->enqueueTaskList(taskList);
+
+    startThread();
+}
+
+void QFileCopierPrivate::startThread()
+{
+    if (!thread->isRunning()) {
+        thread->start();
+        setState(QFileCopier::Busy);
+    }
 }
 
 void QFileCopierPrivate::onStarted(int id)
@@ -182,6 +191,11 @@ void QFileCopierPrivate::onFinished(int id)
 {
     qDebug() << "finished id" << id << QThread::currentThread() << qApp->thread();
     currentRequests.pop();
+}
+
+void QFileCopierPrivate::onThreadFinished()
+{
+    setState(QFileCopier::Idle);
 }
 
 /*!
@@ -199,7 +213,8 @@ QFileCopier::QFileCopier(QObject *parent) :
     connect(d->thread, SIGNAL(stageChanged(QFileCopier::Stage)), d, SLOT(stageChanged(QFileCopier::Stage)));
     connect(d->thread, SIGNAL(started(int)), d, SLOT(onStarted(int)));
     connect(d->thread, SIGNAL(finished(int)), d, SLOT(onFinished(int)));
-    d->thread->start();
+    connect(d->thread, SIGNAL(finished()), d, SLOT(onThreadFinished()));
+    d->state = Idle;
 }
 
 QFileCopier::~QFileCopier()
@@ -250,4 +265,17 @@ void QFileCopier::remove(const QStringList &paths, CopyFlags flags)
 QFileCopier::Stage QFileCopier::stage() const
 {
     return d_func()->thread->stage();
+}
+
+QFileCopier::State QFileCopier::state() const
+{
+    return d_func()->state;
+}
+
+void QFileCopierPrivate::setState(QFileCopier::State s)
+{
+    if (state != s) {
+        state = s;
+        emit q_func()->stateChanged(state);
+    }
 }
