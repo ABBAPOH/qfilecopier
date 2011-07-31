@@ -73,7 +73,7 @@ public:
     QString destinationFilePath(int id) const;
 //    bool isDir(int id) const;
 //    QList<int> entryList(int id) const;
-//    int currentId() const;
+    int currentId() const;
 
     Stage stage() const;
     State state() const;
@@ -87,7 +87,7 @@ public slots:
 //    void cancelAll();
 //    void cancel(int id);
 
-//    void skip();
+    void skip();
 //    void skipAll();
 //    void retry();
 
@@ -102,7 +102,7 @@ public slots:
 //    void mergeAll();
 
 signals:
-//    void error(int id, QFileCopier::Error error, bool stopped);
+    void error(QFileCopier::Error error, bool stopped);
 
     void stateChanged(QFileCopier::State);
     void stageChanged(QFileCopier::Stage);

@@ -7,10 +7,12 @@
 #include <QtCore/QDirIterator>
 #include <QtCore/QFileInfo>
 #include <QtCore/QMutex>
-#include <QtCore/QReadWriteLock>
 #include <QtCore/QQueue>
+#include <QtCore/QReadWriteLock>
+#include <QtCore/QSet>
 #include <QtCore/QStack>
 #include <QtCore/QThread>
+#include <QtCore/QWaitCondition>
 
 struct Task
 {
@@ -24,8 +26,12 @@ struct Task
 
 struct Request : public Task
 {
+    Request() : isDir(false), canceled(false) {}
+
     bool isDir;
     QList<int> childRequests;
+
+    bool canceled;
 };
 
 class QFileCopierThread : public QThread
@@ -47,6 +53,8 @@ public:
 
     void emitProgress();
 
+    void skip();
+
 protected:
     void run();
 
@@ -55,21 +63,29 @@ signals:
     void started(int);
     void finished(int);
     void progress(qint64 progress, qint64 size);
+    void error(QFileCopier::Error error, bool stopped);
 
 private:
     void createRequest(Task r);
     int addFileToQueue(const Task &r);
     int addDirToQueue(const Task &r);
-    void processRequest(int id);
+    bool processRequest(const Request &, QFileCopier::Error *);
+    void handle(int id);
 
 private:
     mutable QReadWriteLock lock;
     QQueue<Task> taskQueue;
     QQueue<int> requestQueue;
     QList<Request> requests;
+    int currentId;
 
     volatile QFileCopier::Stage m_stage;
     volatile bool shouldEmitProgress;
+    bool stopRequest;
+    QWaitCondition interactionCondition;
+    bool waitingForInteraction;
+    bool skipAllRequest;
+    QSet<QFileCopier::Error> skipAllError;
 };
 
 class QFileCopierPrivate : public QObject
@@ -82,7 +98,7 @@ public:
 
     QFileCopierThread *thread;
     QFileCopier::State state;
-    QStack<int> currentRequests;
+    QStack<int> requestStack;
     int progressTimerId;
     int progressInterval;
 
