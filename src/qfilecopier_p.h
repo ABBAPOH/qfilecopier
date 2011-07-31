@@ -45,6 +45,8 @@ public:
 
     Request request(int id) const;
 
+    void emitProgress();
+
 protected:
     void run();
 
@@ -52,6 +54,7 @@ signals:
     void stageChanged(QFileCopier::Stage);
     void started(int);
     void finished(int);
+    void progress(qint64 progress, qint64 size);
 
 private:
     void createRequest(Task r);
@@ -66,6 +69,7 @@ private:
     QList<Request> requests;
 
     volatile QFileCopier::Stage m_stage;
+    volatile bool shouldEmitProgress;
 };
 
 class QFileCopierPrivate : public QObject
@@ -78,6 +82,9 @@ public:
 
     QFileCopierThread *thread;
     QFileCopier::State state;
+    QStack<int> currentRequests;
+    int progressTimerId;
+    int progressInterval;
 
     void enqueueOperation(Task::Type operationType, const QStringList &sourcePaths,
                           const QString &destinationPath, QFileCopier::CopyFlags flags);
@@ -90,9 +97,10 @@ public slots:
     void onFinished(int);
     void onThreadFinished();
 
-private:
-    QStack<int> currentRequests;
+protected:
+    void timerEvent(QTimerEvent *);
 
+private:
     QFileCopier *q_ptr;
 };
 

@@ -9,7 +9,7 @@ class QFileCopierPrivate;
 class QFILECOPIERSHARED_EXPORT QFileCopier : public QObject
 {
     Q_OBJECT
-//    Q_PROPERTY(int progressInterval READ progressInterval WRITE setProgressInterval)
+    Q_PROPERTY(int progressInterval READ progressInterval WRITE setProgressInterval)
 //    Q_PROPERTY(bool autoReset READ autoReset WRITE setAutoReset)
 public:
     explicit QFileCopier(QObject *parent = 0);
@@ -75,13 +75,13 @@ public:
 //    QList<int> entryList(int id) const;
 //    int currentId() const;
 
-    State state() const;
     Stage stage() const;
+    State state() const;
 
 //    void setAutoReset(bool on);
 //    bool autoReset() const;
-//    int progressInterval() const;
-//    void setProgressInterval(int ms);
+    int progressInterval() const;
+    void setProgressInterval(int ms);
 
 public slots:
 //    void cancelAll();
@@ -109,7 +109,7 @@ signals:
 
 //    void done(bool error);
     void started(int id);
-//    void dataTransferProgress(int id, qint64 progress);
+    void progress(qint64 progress, qint64 size);
     void finished(int id, bool error);
 //    void canceled();
 

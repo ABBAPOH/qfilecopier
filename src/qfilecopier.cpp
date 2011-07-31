@@ -12,6 +12,7 @@ QFileCopierThread::QFileCopierThread(QObject *parent) :
     lock(QReadWriteLock::Recursive)
 {
     m_stage = QFileCopier::NoStage;
+    shouldEmitProgress = false;
 }
 
 QFileCopierThread::~QFileCopierThread()
@@ -40,6 +41,11 @@ Request QFileCopierThread::request(int id) const
 {
     QReadLocker l(&lock);
     return requests.at(id);
+}
+
+void QFileCopierThread::emitProgress()
+{
+    shouldEmitProgress = true;
 }
 
 void QFileCopierThread::run()
@@ -154,18 +160,50 @@ void QFileCopierThread::processRequest(int id)
             processRequest(id);
         }
     } else {
-        QFile s(r.source);
-        s.open(QFile::ReadOnly); // check if opened
-        QFile d(r.dest);
-        d.open(QFile::WriteOnly);
-        while (!s.atEnd()) {
+        QFile sourceFile(r.source);
+        sourceFile.open(QFile::ReadOnly); // check if opened
+        QFile destFile(r.dest);
+        destFile.open(QFile::WriteOnly);
+        const int bufferSize = 4*1024; // 4 Kb
+        char *buffer = new char[bufferSize];
+        qint64 totalBytesWritten = 0;
+        qint64 totalFileSize = sourceFile.size();
+        while (true) {
             // todo: buffersize + char buffer
             // check error while reading
-            QByteArray chunk = s.read(1024);
-            d.write(chunk);
-//            if (shouldEmit)
-//                emit progress(currentWritten);
+            qint64 lenRead = sourceFile.read(buffer, bufferSize);
+            if (lenRead == 0) {
+                emit progress(totalBytesWritten, totalFileSize);
+                break;
+            }
+
+            if (lenRead == -1) {
+                // error
+                break;
+            }
+
+            qint64 lenWritten = 0;
+            while (lenWritten < lenRead) {
+                qint64 tmpLenWritten = destFile.write(buffer + lenWritten, lenRead);
+                if (tmpLenWritten == -1) {
+                    // error
+                    break;
+                }
+                lenWritten += tmpLenWritten;
+            }
+
+            totalBytesWritten += lenWritten;
+            if (totalFileSize < totalBytesWritten) {
+                totalFileSize = totalBytesWritten;
+            }
+
+            if (shouldEmitProgress) {
+                //todo : update size in request
+                shouldEmitProgress = false;
+                emit progress(totalBytesWritten, totalFileSize);
+            }
         }
+        delete [] buffer;
     }
     emit finished(id);
 }
@@ -213,6 +251,13 @@ void QFileCopierPrivate::onThreadFinished()
     setState(QFileCopier::Idle);
 }
 
+void QFileCopierPrivate::timerEvent(QTimerEvent *e)
+{
+    if (e->timerId() == progressTimerId) {
+        thread->emitProgress();
+    }
+}
+
 /*!
     \class QFileCopier
 
@@ -230,8 +275,12 @@ QFileCopier::QFileCopier(QObject *parent) :
     connect(d->thread, SIGNAL(stageChanged(QFileCopier::Stage)), SIGNAL(stageChanged(QFileCopier::Stage)));
     connect(d->thread, SIGNAL(started(int)), d, SLOT(onStarted(int)));
     connect(d->thread, SIGNAL(finished(int)), d, SLOT(onFinished(int)));
+    connect(d->thread, SIGNAL(progress(qint64,qint64)), SIGNAL(progress(qint64,qint64)));
     connect(d->thread, SIGNAL(finished()), d, SLOT(onThreadFinished()));
     d->state = Idle;
+
+    d->progressInterval = 500;
+    d->progressTimerId = d->startTimer(d->progressInterval);
 }
 
 QFileCopier::~QFileCopier()
@@ -304,5 +353,21 @@ void QFileCopierPrivate::setState(QFileCopier::State s)
     if (state != s) {
         state = s;
         emit q_func()->stateChanged(state);
+    }
+}
+
+int QFileCopier::progressInterval() const
+{
+    return d_func()->progressInterval;
+}
+
+void QFileCopier::setProgressInterval(int ms)
+{
+    Q_D(QFileCopier);
+
+    if (d->progressInterval != ms) {
+        d->killTimer(d->progressTimerId);
+        d->progressInterval = ms;
+        d->progressTimerId = d->startTimer(d->progressInterval);
     }
 }

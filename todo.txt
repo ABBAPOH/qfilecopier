@@ -1,6 +1,5 @@
-- Building request tree bug (if dest param has '/ at end)
 - Move, Remove (and Link?) operations
 - CopyFlags
-- Progress signals
 - Error handling
 - Other API
+- Gathering progress
