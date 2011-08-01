@@ -44,6 +44,8 @@ public:
     explicit QFileCopierThread(QObject *parent = 0);
     ~QFileCopierThread();
 
+    int currentId();
+
     void enqueueTaskList(const QList<Task> &list);
 
     QFileCopier::Stage stage() const;
@@ -82,7 +84,7 @@ private:
     QQueue<Task> taskQueue;
     QQueue<int> requestQueue;
     QList<Request> requests;
-    int currentId;
+    QStack<int> requestStack;
 
     volatile QFileCopier::Stage m_stage;
     volatile bool shouldEmitProgress;
@@ -103,7 +105,6 @@ public:
 
     QFileCopierThread *thread;
     QFileCopier::State state;
-    QStack<int> requestStack;
     int progressTimerId;
     int progressInterval;
 

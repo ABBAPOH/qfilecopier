@@ -23,6 +23,15 @@ QFileCopierThread::~QFileCopierThread()
     wait();
 }
 
+int QFileCopierThread::currentId()
+{
+    QReadLocker l(&lock);
+
+    if (requestStack.isEmpty())
+        return -1;
+    return requestStack.top();
+}
+
 void QFileCopierThread::enqueueTaskList(const QList<Task> &list)
 {
     QWriteLocker l(&lock);
@@ -76,8 +85,7 @@ void QFileCopierThread::skip()
     if (!waitingForInteraction)
         return;
 
-    qDebug() << currentId;
-    requests[currentId].canceled = true;
+    requests[requestStack.top()].canceled = true;
     interactionCondition.wakeOne();
     waitingForInteraction = false;
 }
@@ -88,7 +96,7 @@ void QFileCopierThread::skipAll()
     if (!waitingForInteraction)
         return;
 
-    cancelUnlocked(currentId);
+    cancelUnlocked(requestStack.top());
     skipAllRequest = true;
     interactionCondition.wakeOne();
     waitingForInteraction = false;
@@ -268,17 +276,16 @@ bool QFileCopierThread::processRequest(const Request &r, QFileCopier::Error *err
 
 void QFileCopierThread::handle(int id)
 {
+    lock.lockForWrite();
     emit started(id);
+    requestStack.push(id);
+    lock.unlock();
 
     bool done = false;
     QFileCopier::Error err = QFileCopier::NoError;
     while (!done) {
         Request r = request(id);
-        qDebug() << "on up" << id;
-        currentId = id;
         done = processRequest(r, &err);
-        currentId = id;
-        qDebug() << "on down" << id;
 
         if (done || r.copyFlags & QFileCopier::NonInteractive) {
             done = true;
@@ -304,7 +311,10 @@ void QFileCopierThread::handle(int id)
         }
     }
 
+    lock.lockForWrite();
+    requestStack.pop();
     emit finished(id);
+    lock.unlock();
 }
 
 void QFileCopierPrivate::enqueueOperation(Task::Type operationType, const QStringList &sourcePaths,
@@ -335,13 +345,11 @@ void QFileCopierPrivate::startThread()
 
 void QFileCopierPrivate::onStarted(int id)
 {
-    requestStack.append(id);
     emit q_func()->started(id);
 }
 
 void QFileCopierPrivate::onFinished(int id)
 {
-    requestStack.pop();
     emit q_func()->finished(id, false);
 }
 
@@ -441,11 +449,7 @@ QString QFileCopier::destinationFilePath(int id) const
 
 int QFileCopier::currentId() const
 {
-    Q_D(const QFileCopier);
-
-    if (d->requestStack.isEmpty())
-        return -1;
-    return d->requestStack.top();
+    return d_func()->thread->currentId();
 }
 
 QFileCopier::Stage QFileCopier::stage() const
