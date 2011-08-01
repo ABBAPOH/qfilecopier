@@ -84,12 +84,12 @@ public:
     void setProgressInterval(int ms);
 
 public slots:
-//    void cancelAll();
-//    void cancel(int id);
+    void cancelAll();
+    void cancel(int id);
 
     void skip();
-//    void skipAll();
-//    void retry();
+    void skipAll();
+    void retry();
 
 //    void overwrite();
 //    void overwriteAll();

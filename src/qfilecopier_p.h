@@ -53,7 +53,11 @@ public:
 
     void emitProgress();
 
+    void cancel();
+    void cancel(int id);
     void skip();
+    void skipAll();
+    void retry();
 
 protected:
     void run();
@@ -71,6 +75,7 @@ private:
     int addDirToQueue(const Task &r);
     bool processRequest(const Request &, QFileCopier::Error *);
     void handle(int id);
+    void cancelUnlocked(int id);
 
 private:
     mutable QReadWriteLock lock;

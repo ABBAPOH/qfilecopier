@@ -51,13 +51,55 @@ void QFileCopierThread::emitProgress()
     shouldEmitProgress = true;
 }
 
+void QFileCopierThread::cancel()
+{
+    QWriteLocker l(&lock);
+    for (int id = 0; id < requests.size(); id++) {
+        requests[id].canceled = true;
+    }
+}
+
+void QFileCopierThread::cancel(int id)
+{
+    QWriteLocker l(&lock);
+    cancelUnlocked(id);
+}
+
+void QFileCopierThread::cancelUnlocked(int id)
+{
+    requests[id].canceled = true;
+}
+
 void QFileCopierThread::skip()
 {
+    QWriteLocker l(&lock);
     if (!waitingForInteraction)
         return;
 
     qDebug() << currentId;
     requests[currentId].canceled = true;
+    interactionCondition.wakeOne();
+    waitingForInteraction = false;
+}
+
+void QFileCopierThread::skipAll()
+{
+    QWriteLocker l(&lock);
+    if (!waitingForInteraction)
+        return;
+
+    cancelUnlocked(currentId);
+    skipAllRequest = true;
+    interactionCondition.wakeOne();
+    waitingForInteraction = false;
+}
+
+void QFileCopierThread::retry()
+{
+    QWriteLocker l(&lock);
+    if (!waitingForInteraction)
+        return;
+
     interactionCondition.wakeOne();
     waitingForInteraction = false;
 }
@@ -440,7 +482,27 @@ void QFileCopier::setProgressInterval(int ms)
     }
 }
 
+void QFileCopier::cancelAll()
+{
+    d_func()->thread->cancel();
+}
+
+void QFileCopier::cancel(int id)
+{
+    d_func()->thread->cancel(id);
+}
+
 void QFileCopier::skip()
 {
     d_func()->thread->skip();
+}
+
+void QFileCopier::skipAll()
+{
+    d_func()->thread->skipAll();
+}
+
+void QFileCopier::retry()
+{
+    d_func()->thread->retry();
 }
