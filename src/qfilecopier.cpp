@@ -218,20 +218,39 @@ bool QFileCopierThread::processRequest(const Request &r, QFileCopier::Error *err
         *err = QFileCopier::Canceled;
         return true;
     }
+
+    if (!QFileInfo(r.source).exists()) {
+        *err = QFileCopier::SourceNotExists;
+        return false;
+    }
+
     if (r.isDir) {
+
         QDir().mkpath(r.dest); // check
         foreach (int id, r.childRequests) {
             handle(id);
         }
+
     } else {
+
         QFile sourceFile(r.source);
-        sourceFile.open(QFile::ReadOnly); // check if opened
+        if (!sourceFile.open(QFile::ReadOnly)) {
+            *err = QFileCopier::CannotOpenSourceFile;
+            return false;
+        }
+
         QFile destFile(r.dest);
-        destFile.open(QFile::WriteOnly);
+        if (!destFile.open(QFile::WriteOnly)) {
+            *err = QFileCopier::CannotOpenDestinationFile;
+            return false;
+        }
+
         const int bufferSize = 4*1024; // 4 Kb
         char *buffer = new char[bufferSize];
+
         qint64 totalBytesWritten = 0;
         qint64 totalFileSize = sourceFile.size();
+
         while (true) {
             // todo: buffersize + char buffer
             // check error while reading
@@ -242,18 +261,18 @@ bool QFileCopierThread::processRequest(const Request &r, QFileCopier::Error *err
             }
 
             if (lenRead == -1) {
-                // error
-                break;
+                *err = QFileCopier::CannotReadSourceFile;
+                delete buffer; // scoped pointer:(
+                return false;
             }
 
             qint64 lenWritten = 0;
             while (lenWritten < lenRead) {
                 qint64 tmpLenWritten = destFile.write(buffer + lenWritten, lenRead);
-                *err = QFileCopier::CannotOpenSourceFile;
-                return false;
                 if (tmpLenWritten == -1) {
-                    // error
-                    break;
+                    *err = QFileCopier::CannotWriteDestinationFile;
+                    delete buffer; // scoped pointer:(
+                    return false;
                 }
                 lenWritten += tmpLenWritten;
             }
@@ -270,6 +289,7 @@ bool QFileCopierThread::processRequest(const Request &r, QFileCopier::Error *err
             }
         }
         delete [] buffer;
+
     }
     return true;
 }
