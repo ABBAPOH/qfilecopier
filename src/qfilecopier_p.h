@@ -73,8 +73,10 @@ signals:
 
 private:
     void createRequest(Task r);
+    bool checkRequest(int id);
     int addFileToQueue(const Task &r);
     int addDirToQueue(const Task &r);
+    bool interact(const Request &r, bool done, QFileCopier::Error err);
     bool processRequest(const Request &, QFileCopier::Error *);
     void handle(int id);
     void cancelUnlocked(int id);

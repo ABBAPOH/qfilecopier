@@ -145,8 +145,8 @@ void QFileCopierThread::createRequest(Task t)
 {
     QFileInfo sourceInfo(t.source);
     QFileInfo destInfo(t.dest);
-    if (destInfo.exists() && destInfo.isDir())
-        t.dest = destInfo.absolutePath() + "/" + sourceInfo.fileName();
+    if (destInfo.exists() && destInfo.isDir() && destInfo.fileName() != sourceInfo.fileName())
+        t.dest = destInfo.absoluteFilePath() + "/" + sourceInfo.fileName();
 
     t.dest = QDir::cleanPath(t.dest);
 
@@ -155,7 +155,41 @@ void QFileCopierThread::createRequest(Task t)
         index = addDirToQueue(t);
     else
         index = addFileToQueue(t);
-    requestQueue.append(index);
+
+    if (index != -1)
+        requestQueue.append(index);
+}
+
+bool QFileCopierThread::checkRequest(int id)
+{
+    lock.lockForWrite();
+    requestStack.push(id);
+    lock.unlock();
+
+    bool done = false;
+    QFileCopier::Error err = QFileCopier::NoError;
+    while (!done) {
+        Request r = request(id);
+
+        if (r.canceled) {
+            done = true;
+            err = QFileCopier::Canceled;
+        } else if (!QFileInfo(r.source).exists()) {
+            err = QFileCopier::SourceNotExists;
+        } else if (QFileInfo(r.dest).exists()) {
+            err = QFileCopier::DestinationExists;
+        } else {
+            done = true;
+        }
+
+        done = interact(r, done, err);
+    }
+
+    lock.lockForWrite();
+    requestStack.pop();
+    lock.unlock();
+
+    return err == QFileCopier::NoError;
 }
 
 int QFileCopierThread::addFileToQueue(const Task & task)
@@ -167,9 +201,14 @@ int QFileCopierThread::addFileToQueue(const Task & task)
     r.copyFlags = task.copyFlags;
     r.isDir = false;
 
-    QWriteLocker l(&lock);
+    lock.lockForWrite();
     int id = requests.size();
     requests.append(r);
+    lock.unlock();
+
+    if (!checkRequest(id))
+        return -1;
+
     return id;
 }
 
@@ -187,6 +226,9 @@ int QFileCopierThread::addDirToQueue(const Task &task)
     requests.append(r);
     lock.unlock();
 
+    if (!checkRequest(id))
+        return -1;
+
     QList<int> childRequests;
 
     QDirIterator i(r.source, QDir::AllEntries | QDir::NoDotAndDotDot);
@@ -200,16 +242,46 @@ int QFileCopierThread::addDirToQueue(const Task &task)
         t.dest = r.dest + "/" + sourceInfo.fileName();
         t.copyFlags = r.copyFlags;
 
+        int index = -1;
         if (sourceInfo.isDir())
-            childRequests.append(addDirToQueue(t));
+            index = addDirToQueue(t);
         else
-            childRequests.append(addFileToQueue(t));
+            index = addFileToQueue(t);
+        if (index != -1)
+            childRequests.append(index);
     }
 
 //    QWriteLocker l(&lock); // i think no need as QList hac atomic int within
     requests[id].childRequests = childRequests;
 
     return id;
+}
+
+bool QFileCopierThread::interact(const Request &r, bool done, QFileCopier::Error err)
+{
+    if (done || r.copyFlags & QFileCopier::NonInteractive) {
+        done = true;
+        if (err != QFileCopier::NoError)
+            emit error(err, false);
+    } else {
+        lock.lockForWrite();
+        if (stopRequest || skipAllError.contains(err)) {
+            done = true;
+            if (!stopRequest)
+                emit error(err, false);
+        } else {
+            emit error(err, true);
+            waitingForInteraction = true;
+            interactionCondition.wait(&lock);
+            if (skipAllRequest) {
+                skipAllRequest = false;
+                skipAllError.insert(err);
+            }
+            waitingForInteraction = false;
+        }
+        lock.unlock();
+    }
+    return done;
 }
 
 bool QFileCopierThread::processRequest(const Request &r, QFileCopier::Error *err)
@@ -306,29 +378,7 @@ void QFileCopierThread::handle(int id)
     while (!done) {
         Request r = request(id);
         done = processRequest(r, &err);
-
-        if (done || r.copyFlags & QFileCopier::NonInteractive) {
-            done = true;
-            if (err != QFileCopier::NoError)
-                emit error(err, false);
-        } else {
-            lock.lockForWrite();
-            if (stopRequest || skipAllError.contains(err)) {
-                done = true;
-                if (!stopRequest)
-                    emit error(err, false);
-            } else {
-                emit error(err, true);
-                waitingForInteraction = true;
-                interactionCondition.wait(&lock);
-                if (skipAllRequest) {
-                    skipAllRequest = false;
-                    skipAllError.insert(err);
-                }
-                waitingForInteraction = false;
-            }
-            lock.unlock();
-        }
+        done = interact(r, done, err);
     }
 
     lock.lockForWrite();
