@@ -230,6 +230,10 @@ int QFileCopierThread::addDirToQueue(const Task &task)
     if (!checkRequest(id))
         return -1;
 
+    if (!(r.copyFlags & QFileCopier::CopyOnMove)) {
+        return id;
+    }
+
     QList<int> childRequests;
 
     QDirIterator i(r.source, QDir::AllEntries | QDir::NoDotAndDotDot);
@@ -357,6 +361,34 @@ bool QFileCopierThread::copy(const Request &r, QFileCopier::Error *err)
     return true;
 }
 
+bool QFileCopierThread::move(const Request &r, QFileCopier::Error *err)
+{
+    // mounted folders?
+    bool result = true;
+    if (r.copyFlags & QFileCopier::CopyOnMove) {
+
+        if (r.isDir) {
+            QDir().mkpath(r.dest); // check
+            foreach (int id, r.childRequests) {
+                handle(id);
+            }
+            bool b = QDir().rmdir(r.source);
+            qDebug() << "rmdir" << b << r.source;
+        } else {
+            result = copy(r, err);
+            if (result)
+                result = remove(r, err);
+        }
+
+    } else {
+        result = QFile::rename(r.source, r.dest);
+        if (!result) {
+            *err = QFileCopier::CannotRename;
+        }
+    }
+    return result;
+}
+
 bool QFileCopierThread::remove(const Request &r, QFileCopier::Error *err)
 {
     bool result = true;
@@ -394,6 +426,8 @@ bool QFileCopierThread::processRequest(const Request &r, QFileCopier::Error *err
     switch (r.type) {
     case Task::Copy :
         return copy(r, err);
+    case Task::Move :
+        return move(r, err);
     case Task::Remove :
         return remove(r, err);
     default:

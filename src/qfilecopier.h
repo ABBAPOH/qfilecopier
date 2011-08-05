@@ -49,6 +49,7 @@ public:
         CannotReadSourceFile,
         CannotWriteDestinationFile,
         CannotRemoveSource,
+        CannotRename,
         Canceled
     };
 

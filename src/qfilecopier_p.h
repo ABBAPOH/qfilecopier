@@ -78,6 +78,7 @@ private:
     int addDirToQueue(const Task &r);
     bool interact(const Request &r, bool done, QFileCopier::Error err);
     bool copy(const Request &, QFileCopier::Error *);
+    bool move(const Request &, QFileCopier::Error *);
     bool remove(const Request &, QFileCopier::Error *);
     bool processRequest(const Request &, QFileCopier::Error *);
     void handle(int id);

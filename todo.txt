@@ -3,3 +3,5 @@
 - Error handling
 - Other API
 - Gathering progress
+
+discuss - copying folders to existing folder with new name;

@@ -50,6 +50,8 @@ private:
 void NotificationTest::initTest()
 {
     tempFolder = QDesktopServices::storageLocation(QDesktopServices::TempLocation) + "/notification_test";
+    removePath(tempFolder);
+    qDebug() << "using temp folder" << tempFolder;
     QDir().mkpath(tempFolder);
     QDir d(tempFolder);
     d.mkdir("folder1");
@@ -73,16 +75,17 @@ void NotificationTest::initTest()
 
 void NotificationTest::startTest()
 {
-    copier.copy(tempFolder + "/folder1", tempFolder + "/folder2");
+    qDebug() << "Test move";
+    copier.move(tempFolder + "/folder1", tempFolder + "/folder2", QFileCopier::CopyOnMove);
+//    qDebug() << "Test remove";
+//    copier.remove(tempFolder);
 }
 
 void NotificationTest::cleanTest()
 {
     qDebug() << "";
     qDebug() << "Cleaning test";
-//    qDebug() << "  Removing tmp folder" << removePath(tempFolder);
-    qDebug() << "  Removing tmp folder";
-    copier.remove(tempFolder);
+    qDebug() << "  Removing tmp folder" << removePath(tempFolder);
 }
 
 void NotificationTest::onStateChanged(QFileCopier::State s)
