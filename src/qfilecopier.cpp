@@ -151,6 +151,13 @@ void QFileCopierThread::createRequest(Task t)
 
     t.dest = QDir::cleanPath(t.dest);
 
+#ifdef Q_OS_WIN
+    if (t.type == Task::Link) {
+        if (!t.dest.endsWith(QLatin1String(".lnk")))
+            t.dest += QLatin1String(".lnk");
+    }
+#endif
+
     int index = -1;
     if (sourceInfo.isDir())
         index = addDirToQueue(t);
@@ -230,13 +237,13 @@ int QFileCopierThread::addDirToQueue(const Task &task)
     if (!checkRequest(id))
         return -1;
 
-    if (!(r.copyFlags & QFileCopier::CopyOnMove)) {
+    if (!(r.copyFlags & QFileCopier::CopyOnMove) || r.type == Task::Link) {
         return id;
     }
 
     QList<int> childRequests;
 
-    QDirIterator i(r.source, QDir::AllEntries | QDir::NoDotAndDotDot);
+    QDirIterator i(r.source, QDir::AllEntries | QDir::Hidden | QDir::NoDotAndDotDot);
     while (i.hasNext()) {
         QString source = i.next();
         QFileInfo sourceInfo(source);
@@ -389,6 +396,15 @@ bool QFileCopierThread::move(const Request &r, QFileCopier::Error *err)
     return result;
 }
 
+bool QFileCopierThread::link(const Request &r, QFileCopier::Error *err)
+{
+    bool result = QFile::link(r.source, r.dest);
+    if (!result) {
+        *err = QFileCopier::CannotCreateSymLink;
+    }
+    return result;
+}
+
 bool QFileCopierThread::remove(const Request &r, QFileCopier::Error *err)
 {
     bool result = true;
@@ -428,6 +444,8 @@ bool QFileCopierThread::processRequest(const Request &r, QFileCopier::Error *err
         return copy(r, err);
     case Task::Move :
         return move(r, err);
+    case Task::Link :
+        return link(r, err);
     case Task::Remove :
         return remove(r, err);
     default:

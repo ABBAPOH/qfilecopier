@@ -12,7 +12,7 @@ bool removePath(const QString &path)
     QFileInfo info(path);
     if (info.isDir()) {
         QDir dir(path);
-        foreach (const QString &entry, dir.entryList(QDir::AllDirs | QDir::Files | QDir::NoDotAndDotDot)) {
+        foreach (const QString &entry, dir.entryList(QDir::AllDirs | QDir::Files | QDir::Hidden | QDir::NoDotAndDotDot)) {
             result &= removePath(dir.absoluteFilePath(entry));
         }
         if (!info.dir().rmdir(info.fileName()))
@@ -76,7 +76,7 @@ void NotificationTest::initTest()
 void NotificationTest::startTest()
 {
     qDebug() << "Test move";
-    copier.move(tempFolder + "/folder1", tempFolder + "/folder2", QFileCopier::CopyOnMove);
+    copier.link(tempFolder + "/folder1", tempFolder + "/folder2", QFileCopier::CopyOnMove);
 //    qDebug() << "Test remove";
 //    copier.remove(tempFolder);
 }
