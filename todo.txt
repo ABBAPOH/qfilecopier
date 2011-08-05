@@ -2,5 +2,6 @@
 - Error handling
 - Other API
 - Gathering progress
+- Cleanup/init copier
 
 discuss - copying folders to existing folder with new name;
