@@ -299,7 +299,11 @@ bool QFileCopierThread::copy(const Request &r, QFileCopier::Error *err)
 {
     if (r.isDir) {
 
-        QDir().mkpath(r.dest); // check
+        if (!QDir().mkpath(r.dest)) {
+            *err = QFileCopier::CannotCreateDestinationDirectory;
+            return false;
+        }
+
         foreach (int id, r.childRequests) {
             handle(id);
         }
@@ -375,12 +379,21 @@ bool QFileCopierThread::move(const Request &r, QFileCopier::Error *err)
     if (r.copyFlags & QFileCopier::CopyOnMove) {
 
         if (r.isDir) {
-            QDir().mkpath(r.dest); // check
+
+            if (!QDir().mkpath(r.dest)) {
+                *err = QFileCopier::CannotCreateDestinationDirectory;
+                return false;
+            }
+
             foreach (int id, r.childRequests) {
                 handle(id);
             }
-            bool b = QDir().rmdir(r.source);
-            qDebug() << "rmdir" << b << r.source;
+
+            if (!QDir().rmdir(r.source)) {
+                *err = QFileCopier::CannotRemoveSource;
+                return false;
+            }
+
         } else {
             result = copy(r, err);
             if (result)
