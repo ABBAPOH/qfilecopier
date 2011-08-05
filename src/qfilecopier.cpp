@@ -20,6 +20,7 @@ QFileCopierThread::QFileCopierThread(QObject *parent) :
 
 QFileCopierThread::~QFileCopierThread()
 {
+    // todo: stop operations
     wait();
 }
 
@@ -222,8 +223,8 @@ int QFileCopierThread::addDirToQueue(const Task &task)
     r.isDir = true;
 
     lock.lockForWrite();
-    int id = requests.size();
     requests.append(r);
+    int id = requests.size() - 1;
     lock.unlock();
 
     if (!checkRequest(id))
@@ -368,10 +369,11 @@ bool QFileCopierThread::processRequest(const Request &r, QFileCopier::Error *err
 
 void QFileCopierThread::handle(int id)
 {
-    lock.lockForWrite();
-    emit started(id);
-    requestStack.push(id);
-    lock.unlock();
+    {
+        QWriteLocker l(&lock);
+        emit started(id);
+        requestStack.push(id);
+    }
 
     bool done = false;
     QFileCopier::Error err = QFileCopier::NoError;
@@ -381,10 +383,11 @@ void QFileCopierThread::handle(int id)
         done = interact(r, done, err);
     }
 
-    lock.lockForWrite();
-    requestStack.pop();
-    emit finished(id);
-    lock.unlock();
+    {
+        QWriteLocker l(&lock);
+        requestStack.pop();
+        emit finished(id);
+    }
 }
 
 void QFileCopierPrivate::enqueueOperation(Task::Type operationType, const QStringList &sourcePaths,
