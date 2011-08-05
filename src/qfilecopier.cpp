@@ -87,8 +87,8 @@ void QFileCopierThread::skip()
         return;
 
     requests[requestStack.top()].canceled = true;
-    interactionCondition.wakeOne();
     waitingForInteraction = false;
+    interactionCondition.wakeOne();
 }
 
 void QFileCopierThread::skipAll()
@@ -99,8 +99,8 @@ void QFileCopierThread::skipAll()
 
     cancelUnlocked(requestStack.top());
     skipAllRequest = true;
-    interactionCondition.wakeOne();
     waitingForInteraction = false;
+    interactionCondition.wakeOne();
 }
 
 void QFileCopierThread::retry()
@@ -109,8 +109,8 @@ void QFileCopierThread::retry()
     if (!waitingForInteraction)
         return;
 
-    interactionCondition.wakeOne();
     waitingForInteraction = false;
+    interactionCondition.wakeOne();
 }
 
 void QFileCopierThread::run()
@@ -278,7 +278,6 @@ bool QFileCopierThread::interact(const Request &r, bool done, QFileCopier::Error
                 skipAllRequest = false;
                 skipAllError.insert(err);
             }
-            waitingForInteraction = false;
         }
         lock.unlock();
     }
