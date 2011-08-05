@@ -80,7 +80,9 @@ void NotificationTest::cleanTest()
 {
     qDebug() << "";
     qDebug() << "Cleaning test";
-    qDebug() << "  Removing tmp folder" << removePath(tempFolder);
+//    qDebug() << "  Removing tmp folder" << removePath(tempFolder);
+    qDebug() << "  Removing tmp folder";
+    copier.remove(tempFolder);
 }
 
 void NotificationTest::onStateChanged(QFileCopier::State s)

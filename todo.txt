@@ -1,4 +1,4 @@
-- Move, Remove (and Link?) operations
+- Move and Link operations
 - CopyFlags
 - Error handling
 - Other API

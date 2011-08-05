@@ -284,18 +284,8 @@ bool QFileCopierThread::interact(const Request &r, bool done, QFileCopier::Error
     return done;
 }
 
-bool QFileCopierThread::processRequest(const Request &r, QFileCopier::Error *err)
+bool QFileCopierThread::copy(const Request &r, QFileCopier::Error *err)
 {
-    if (r.canceled) {
-        *err = QFileCopier::Canceled;
-        return true;
-    }
-
-    if (!QFileInfo(r.source).exists()) {
-        *err = QFileCopier::SourceNotExists;
-        return false;
-    }
-
     if (r.isDir) {
 
         QDir().mkpath(r.dest); // check
@@ -363,6 +353,53 @@ bool QFileCopierThread::processRequest(const Request &r, QFileCopier::Error *err
         delete [] buffer;
 
     }
+
+    return true;
+}
+
+bool QFileCopierThread::remove(const Request &r, QFileCopier::Error *err)
+{
+    bool result = true;
+
+    if (r.isDir) {
+
+        foreach (int id, r.childRequests) {
+            handle(id);
+        }
+        result = QDir().rmdir(r.source);
+
+    } else {
+        result = QFile::remove(r.source);
+    }
+
+    if (!result) {
+        *err = QFileCopier::CannotRemoveSource;
+    }
+
+    return result;
+}
+
+bool QFileCopierThread::processRequest(const Request &r, QFileCopier::Error *err)
+{
+    if (r.canceled) {
+        *err = QFileCopier::Canceled;
+        return true;
+    }
+
+    if (!QFileInfo(r.source).exists()) {
+        *err = QFileCopier::SourceNotExists;
+        return false;
+    }
+
+    switch (r.type) {
+    case Task::Copy :
+        return copy(r, err);
+    case Task::Remove :
+        return remove(r, err);
+    default:
+        break;
+    }
+
     return true;
 }
 
