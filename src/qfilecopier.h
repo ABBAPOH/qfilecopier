@@ -82,6 +82,8 @@ public:
     int progressInterval() const;
     void setProgressInterval(int ms);
 
+    void waitForFinished(unsigned long msecs = ULONG_MAX);
+
 public slots:
     void cancelAll();
     void cancel(int id);

@@ -660,6 +660,11 @@ void QFileCopier::setProgressInterval(int ms)
     }
 }
 
+void QFileCopier::waitForFinished(unsigned long msecs)
+{
+    d_func()->thread->wait(msecs);
+}
+
 void QFileCopier::cancelAll()
 {
     d_func()->thread->cancel();
