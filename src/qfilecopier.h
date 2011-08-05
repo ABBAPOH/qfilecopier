@@ -33,7 +33,8 @@ public:
         NonInteractive = 0x01,
         Force = 0x02,
         CancelOnError = 0x04,
-        FollowLinks = 0x08 // if not set links are copied
+        FollowLinks = 0x08, // if not set links are copied
+        CopyOnMove = 0x10
     };
 
     enum Error {
