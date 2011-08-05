@@ -26,10 +26,16 @@ bool removePath(const QString &path)
 class NotificationTest : public QObject
 {
     Q_OBJECT
-public:
 
+public:
     void initTest();
-    void startTest();
+
+    void testCopy();
+    void testMove();
+    void testRename();
+    void testLink();
+    void testRemove();
+
     void cleanTest();
 
 public slots:
@@ -73,12 +79,34 @@ void NotificationTest::initTest()
     connect(&copier, SIGNAL(error(QFileCopier::Error,bool)), SLOT(onError(QFileCopier::Error,bool)));
 }
 
-void NotificationTest::startTest()
+void NotificationTest::testCopy()
 {
-    qDebug() << "Test move";
-    copier.link(tempFolder + "/folder1", tempFolder + "/folder2", QFileCopier::CopyOnMove);
-//    qDebug() << "Test remove";
-//    copier.remove(tempFolder);
+    qDebug() << "testCopy";
+    copier.copy(tempFolder + "/folder1", tempFolder + "/folder2");
+}
+
+void NotificationTest::testMove()
+{
+    qDebug() << "testMove";
+    copier.move(tempFolder + "/folder1", tempFolder + "/folder2", QFileCopier::CopyOnMove);
+}
+
+void NotificationTest::testRename()
+{
+    qDebug() << "testRename";
+    copier.move(tempFolder + "/folder1", tempFolder + "/folder2");
+}
+
+void NotificationTest::testLink()
+{
+    qDebug() << "testLink";
+    copier.link(tempFolder + "/folder1", tempFolder + "/folder2");
+}
+
+void NotificationTest::testRemove()
+{
+    qDebug() << "testRemove";
+    copier.remove(tempFolder + "/folder1");
 }
 
 void NotificationTest::cleanTest()
@@ -139,10 +167,12 @@ int main(int argc, char *argv[])
 
     NotificationTest t;
     t.initTest();
-    t.startTest();
-//    t.cleanTest();
 
-//    QTimer::singleShot(5000, &a, SLOT(quit()));
+    t.testCopy();
+    t.testMove();
+    t.testRename();
+    t.testLink();
+    t.testRename();
 
     return a.exec();
 }
