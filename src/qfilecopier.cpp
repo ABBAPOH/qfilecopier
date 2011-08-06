@@ -53,7 +53,7 @@ void QFileCopierThread::setStage(QFileCopier::Stage stage)
 Request QFileCopierThread::request(int id) const
 {
     QReadLocker l(&lock);
-    return requests.at(id);
+    return requests.value(id);
 }
 
 void QFileCopierThread::emitProgress()
@@ -271,7 +271,7 @@ int QFileCopierThread::addDirToQueue(const Task &task)
 
 bool QFileCopierThread::interact(const Request &r, bool done, QFileCopier::Error err)
 {
-    if (done || r.copyFlags & QFileCopier::NonInteractive) {
+    if (done || (r.copyFlags & QFileCopier::NonInteractive)) {
         done = true;
         if (err != QFileCopier::NoError)
             emit error(err, false);
@@ -317,13 +317,13 @@ bool QFileCopierThread::copy(const Request &r, QFileCopier::Error *err)
         }
 
         QFile destFile(r.dest);
-        if (!destFile.open(QFile::WriteOnly)) {
+        if (!destFile.open(QFile::WriteOnly | QFile::Unbuffered)) {
             *err = QFileCopier::CannotOpenDestinationFile;
             return false;
         }
 
         const int bufferSize = 4*1024; // 4 Kb
-        char *buffer = new char[bufferSize];
+        QScopedArrayPointer<char> buffer(new char[bufferSize]);
 
         qint64 totalBytesWritten = 0;
         qint64 totalFileSize = sourceFile.size();
@@ -331,7 +331,7 @@ bool QFileCopierThread::copy(const Request &r, QFileCopier::Error *err)
         while (true) {
             // todo: buffersize + char buffer
             // check error while reading
-            qint64 lenRead = sourceFile.read(buffer, bufferSize);
+            qint64 lenRead = sourceFile.read(buffer.data(), bufferSize);
             if (lenRead == 0) {
                 emit progress(totalBytesWritten, totalFileSize);
                 break;
@@ -339,16 +339,14 @@ bool QFileCopierThread::copy(const Request &r, QFileCopier::Error *err)
 
             if (lenRead == -1) {
                 *err = QFileCopier::CannotReadSourceFile;
-                delete buffer; // scoped pointer:(
                 return false;
             }
 
             qint64 lenWritten = 0;
             while (lenWritten < lenRead) {
-                qint64 tmpLenWritten = destFile.write(buffer + lenWritten, lenRead);
+                qint64 tmpLenWritten = destFile.write(buffer.data() + lenWritten, lenRead - lenWritten);
                 if (tmpLenWritten == -1) {
                     *err = QFileCopier::CannotWriteDestinationFile;
-                    delete buffer; // scoped pointer:(
                     return false;
                 }
                 lenWritten += tmpLenWritten;
@@ -365,7 +363,6 @@ bool QFileCopierThread::copy(const Request &r, QFileCopier::Error *err)
                 emit progress(totalBytesWritten, totalFileSize);
             }
         }
-        delete [] buffer;
 
     }
 
@@ -447,10 +444,11 @@ bool QFileCopierThread::processRequest(const Request &r, QFileCopier::Error *err
         return true;
     }
 
-    if (!QFileInfo(r.source).exists()) {
-        *err = QFileCopier::SourceNotExists;
-        return false;
-    }
+// we skip this check to improve performance (if file removed after starting, we just coulnd't open/link it)
+//    if (!QFileInfo(r.source).exists()) {
+//        *err = QFileCopier::SourceNotExists;
+//        return false;
+//    }
 
     switch (r.type) {
     case Task::Copy :
