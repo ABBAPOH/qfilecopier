@@ -70,6 +70,8 @@ signals:
     void finished(int);
     void progress(qint64 progress, qint64 size);
     void error(QFileCopier::Error error, bool stopped);
+    void done(bool error);
+    void canceled();
 
 private:
     void createRequest(Task r);
@@ -99,6 +101,8 @@ private:
     bool waitingForInteraction;
     bool skipAllRequest;
     QSet<QFileCopier::Error> skipAllError;
+    bool cancelAllRequest;
+    bool hasError;
 };
 
 class QFileCopierPrivate : public QObject

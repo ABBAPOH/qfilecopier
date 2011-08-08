@@ -16,6 +16,7 @@ QFileCopierThread::QFileCopierThread(QObject *parent) :
     shouldEmitProgress = false;
     stopRequest = false;
     skipAllRequest = false;
+    hasError = true;
 }
 
 QFileCopierThread::~QFileCopierThread()
@@ -67,6 +68,7 @@ void QFileCopierThread::cancel()
     for (int id = 0; id < requests.size(); id++) {
         requests[id].canceled = true;
     }
+    cancelAllRequest = true;
 }
 
 void QFileCopierThread::cancel(int id)
@@ -119,6 +121,10 @@ void QFileCopierThread::run()
 
     while (!stop) {
 
+        if (cancelAllRequest) {
+            emit canceled();
+            break;
+        }
         lock.lockForWrite();
         if (!taskQueue.isEmpty()) {
             setStage(QFileCopier::Gathering);
@@ -139,6 +145,8 @@ void QFileCopierThread::run()
         }
     }
 
+    emit done(hasError);
+    hasError = false;
     setStage(QFileCopier::NoStage);
 }
 
@@ -484,6 +492,9 @@ void QFileCopierThread::handle(int id)
         done = interact(r, done, err);
     }
 
+    if (err != QFileCopier::NoError)
+        hasError = true;
+
     {
         QWriteLocker l(&lock);
         requestStack.pop();
@@ -560,6 +571,7 @@ QFileCopier::QFileCopier(QObject *parent) :
     connect(d->thread, SIGNAL(progress(qint64,qint64)), SIGNAL(progress(qint64,qint64)));
     connect(d->thread, SIGNAL(error(QFileCopier::Error,bool)), SIGNAL(error(QFileCopier::Error,bool)));
     connect(d->thread, SIGNAL(finished()), d, SLOT(onThreadFinished()));
+    connect(d->thread, SIGNAL(done(bool)), SIGNAL(done(bool)));
     d->state = Idle;
 
     d->progressInterval = 500;
@@ -619,6 +631,16 @@ QString QFileCopier::sourceFilePath(int id) const
 QString QFileCopier::destinationFilePath(int id) const
 {
     return d_func()->thread->request(id).dest;
+}
+
+bool QFileCopier::isDir(int id) const
+{
+    return d_func()->thread->request(id).isDir;
+}
+
+QList<int> QFileCopier::entryList(int id) const
+{
+    return d_func()->thread->request(id).childRequests;
 }
 
 int QFileCopier::currentId() const
