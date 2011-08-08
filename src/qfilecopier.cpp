@@ -74,12 +74,16 @@ void QFileCopierThread::cancel()
 void QFileCopierThread::cancel(int id)
 {
     QWriteLocker l(&lock);
-    cancelUnlocked(id);
+    requests[id].canceled = true;
 }
 
-void QFileCopierThread::cancelUnlocked(int id)
+void QFileCopierThread::overwriteChildren(int id)
 {
-    requests[id].canceled = true;
+    Request &r = requests[id];
+    r.overwrite = true;
+    for (int i = 0; i < r.childRequests.size(); i++) {
+        overwriteChildren(r.childRequests[i]);
+    }
 }
 
 void QFileCopierThread::skip()
@@ -99,8 +103,31 @@ void QFileCopierThread::skipAll()
     if (!waitingForInteraction)
         return;
 
-    cancelUnlocked(requestStack.top());
+    int id = requestStack.top();
+    requests[id].canceled = true;
     skipAllRequest = true;
+    waitingForInteraction = false;
+    interactionCondition.wakeOne();
+}
+
+void QFileCopierThread::overwrite()
+{
+    QWriteLocker l(&lock);
+    if (!waitingForInteraction)
+        return;
+
+    overwriteChildren(requestStack.top());
+    waitingForInteraction = false;
+    interactionCondition.wakeOne();
+}
+
+void QFileCopierThread::overwriteAll()
+{
+    QWriteLocker l(&lock);
+    if (!waitingForInteraction)
+        return;
+
+    overwriteAllRequest = true;
     waitingForInteraction = false;
     interactionCondition.wakeOne();
 }
@@ -113,6 +140,19 @@ void QFileCopierThread::retry()
 
     waitingForInteraction = false;
     interactionCondition.wakeOne();
+}
+
+void QFileCopierThread::resetSkip()
+{
+    QWriteLocker l(&lock);
+    skipAllError.clear();
+}
+
+void QFileCopierThread::resetOverwrite()
+{
+    // not sure this is correct
+    QWriteLocker l(&lock);
+    overwriteAllRequest = true;
 }
 
 void QFileCopierThread::run()
@@ -325,7 +365,17 @@ bool QFileCopierThread::copy(const Request &r, QFileCopier::Error *err)
         }
 
         QFile destFile(r.dest);
-        if (!destFile.open(QFile::WriteOnly)) {
+        bool result = destFile.open(QFile::WriteOnly);
+        if (!result) {
+            if (r.overwrite || overwriteAllRequest) {
+                result = destFile.remove();
+                if (!result) {
+                    *err = QFileCopier::CannotRemoveDestinationFile;
+                }
+            }
+        }
+        result = destFile.open(QFile::WriteOnly);
+        if (!result) {
             *err = QFileCopier::CannotOpenDestinationFile;
             return false;
         }
@@ -419,6 +469,12 @@ bool QFileCopierThread::move(const Request &r, QFileCopier::Error *err)
 
 bool QFileCopierThread::link(const Request &r, QFileCopier::Error *err)
 {
+    if (r.overwrite && QFileInfo(r.dest).exists()) {
+        if (!QFile::remove(r.dest)) {
+            *err = QFileCopier::CannotRemoveDestinationFile;
+            return false;
+        }
+    }
     bool result = QFile::link(r.source, r.dest);
     if (!result) {
         *err = QFileCopier::CannotCreateSymLink;
@@ -710,4 +766,29 @@ void QFileCopier::skipAll()
 void QFileCopier::retry()
 {
     d_func()->thread->retry();
+}
+
+void QFileCopier::overwrite()
+{
+
+}
+
+void QFileCopier::overwriteAll()
+{
+}
+
+void QFileCopier::reset()
+{
+    resetSkip();
+    resetOverwrite();
+}
+
+void QFileCopier::resetSkip()
+{
+    d_func()->thread->resetSkip();
+}
+
+void QFileCopier::resetOverwrite()
+{
+    d_func()->thread->resetOverwrite();
 }

@@ -92,12 +92,12 @@ public slots:
     void skipAll();
     void retry();
 
-//    void overwrite();
-//    void overwriteAll();
+    void overwrite();
+    void overwriteAll();
 
-//    void reset();
-//    void resetSkip();
-//    void resetOverwrite();
+    void reset();
+    void resetSkip();
+    void resetOverwrite();
 
 //    void merge();
 //    void mergeAll();
