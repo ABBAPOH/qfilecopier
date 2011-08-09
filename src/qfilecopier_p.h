@@ -32,6 +32,7 @@ struct Request : public Task
     QList<int> childRequests;
 
     bool canceled;
+    bool overwrite;
 };
 
 class QFileCopierThread : public QThread
@@ -61,6 +62,12 @@ public:
     void skipAll();
     void retry();
 
+    void overwrite();
+    void overwriteAll();
+
+    void resetSkip();
+    void resetOverwrite();
+
 protected:
     void run();
 
@@ -70,6 +77,8 @@ signals:
     void finished(int);
     void progress(qint64 progress, qint64 size);
     void error(QFileCopier::Error error, bool stopped);
+    void done(bool error);
+    void canceled();
 
 private:
     void createRequest(Task r);
@@ -83,7 +92,7 @@ private:
     bool remove(const Request &, QFileCopier::Error *);
     bool processRequest(const Request &, QFileCopier::Error *);
     void handle(int id);
-    void cancelUnlocked(int id);
+    void overwriteChildren(int id);
 
 private:
     mutable QReadWriteLock lock;
@@ -99,6 +108,9 @@ private:
     bool waitingForInteraction;
     bool skipAllRequest;
     QSet<QFileCopier::Error> skipAllError;
+    bool cancelAllRequest;
+    bool hasError;
+    bool overwriteAllRequest;
 };
 
 class QFileCopierPrivate : public QObject

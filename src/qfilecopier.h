@@ -70,8 +70,8 @@ public:
 //    QList<int> pendingRequests() const;
     QString sourceFilePath(int id) const;
     QString destinationFilePath(int id) const;
-//    bool isDir(int id) const;
-//    QList<int> entryList(int id) const;
+    bool isDir(int id) const;
+    QList<int> entryList(int id) const;
     int currentId() const;
 
     Stage stage() const;
@@ -92,12 +92,12 @@ public slots:
     void skipAll();
     void retry();
 
-//    void overwrite();
-//    void overwriteAll();
+    void overwrite();
+    void overwriteAll();
 
-//    void reset();
-//    void resetSkip();
-//    void resetOverwrite();
+    void reset();
+    void resetSkip();
+    void resetOverwrite();
 
 //    void merge();
 //    void mergeAll();
@@ -108,11 +108,11 @@ signals:
     void stateChanged(QFileCopier::State);
     void stageChanged(QFileCopier::Stage);
 
-//    void done(bool error);
+    void done(bool error);
     void started(int id);
     void progress(qint64 progress, qint64 size);
     void finished(int id, bool error);
-//    void canceled();
+    void canceled();
 
 private:
     QFileCopierPrivate *d_ptr;
