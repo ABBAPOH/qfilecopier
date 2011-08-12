@@ -2,5 +2,7 @@ TEMPLATE = subdirs
 
 SUBDIRS += \
     copiertest \
-    notificationtest
+    notificationtest \
+    qfilecopier_tst
+
 
