@@ -233,6 +233,11 @@ void QFileCopierThread::createRequest(Task t)
         requestQueue.append(index);
 }
 
+bool QFileCopierThread::shouldOverwrite(const Request &r)
+{
+    return r.overwrite || overwriteAllRequest || r.copyFlags | QFileCopier::Force;
+}
+
 bool QFileCopierThread::checkRequest(int id)
 {
     lock.lockForWrite();
@@ -250,7 +255,7 @@ bool QFileCopierThread::checkRequest(int id)
             err = QFileCopier::Canceled;
         } else if (!QFileInfo(r.source).exists()) {
             err = QFileCopier::SourceNotExists;
-        } else if (!(r.overwrite || overwriteAllRequest) && QFileInfo(r.dest).exists()) {
+        } else if (!shouldOverwrite(r) && QFileInfo(r.dest).exists()) {
             err = QFileCopier::DestinationExists;
         } else {
             done = true;
@@ -475,12 +480,6 @@ bool QFileCopierThread::move(const Request &r, QFileCopier::Error *err)
 
 bool QFileCopierThread::link(const Request &r, QFileCopier::Error *err)
 {
-    if (r.overwrite && QFileInfo(r.dest).exists()) {
-        if (!QFile::remove(r.dest)) {
-            *err = QFileCopier::CannotRemoveDestinationFile;
-            return false;
-        }
-    }
     bool result = QFile::link(r.source, r.dest);
     if (!result) {
         *err = QFileCopier::CannotCreateSymLink;
@@ -523,7 +522,7 @@ bool QFileCopierThread::processRequest(const Request &r, QFileCopier::Error *err
 //        return false;
 //    }
 
-    if (r.overwrite || overwriteAllRequest) {
+    if (shouldOverwrite(r)) {
         if (QFileInfo(r.dest).exists()) {
             bool result = removePath(r.dest);
             if (!result) {

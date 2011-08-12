@@ -83,7 +83,7 @@ void NotificationTest::testCopy()
 {
     qDebug() << "testCopy";
     QDir().mkpath(tempFolder + "/folder2/folder1");
-    copier.copy(tempFolder + "/folder1", tempFolder + "/folder2");
+    copier.copy(tempFolder + "/folder1", tempFolder + "/folder2", QFileCopier::Force);
 }
 
 void NotificationTest::testMove()

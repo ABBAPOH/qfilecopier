@@ -82,6 +82,7 @@ signals:
 
 private:
     void createRequest(Task r);
+    bool shouldOverwrite(const Request &r);
     bool checkRequest(int id);
     int addFileToQueue(const Task &r);
     int addDirToQueue(const Task &r);
