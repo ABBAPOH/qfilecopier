@@ -55,6 +55,7 @@ public:
 
     Request request(int id) const;
 
+    qint64 totalProgress() const;
     qint64 totalSize() const;
 
     void emitProgress();
@@ -115,6 +116,7 @@ private:
     bool cancelAllRequest;
     bool hasError;
     bool overwriteAllRequest;
+    qint64 m_totalProgress;
     qint64 m_totalSize;
 };
 

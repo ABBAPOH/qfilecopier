@@ -82,8 +82,8 @@ void NotificationTest::initTest()
 void NotificationTest::testCopy()
 {
     qDebug() << "testCopy";
-    QDir().mkpath(tempFolder + "/folder2/folder1");
-    copier.copy(tempFolder + "/folder1", tempFolder + "/folder2", QFileCopier::Force);
+//    QDir().mkpath(tempFolder + "/folder2/folder1");
+    copier.copy(tempFolder + "/folder1/file.bin", tempFolder + "/folder2", QFileCopier::Force);
 }
 
 void NotificationTest::testMove()
@@ -151,7 +151,8 @@ void NotificationTest::onFinished(int id)
 void NotificationTest::onProgress(qint64 w, qint64 s)
 {
     Q_ASSERT_X(QThread::currentThread() == qApp->thread(), "NotificationTest::onProgress", "slot invoked from wrong thread");
-    qDebug() << QString("      Progress %1 / %2 (%3)").arg(w).arg(s).arg(s == 0 ? 0 : 100*w/s).toLatin1().data();
+    qDebug() << QString("      Progress %1 / %2 (%3)").arg(w/1024).arg(s/1024).arg(s == 0 ? 0 : 100*w/s).toLatin1().data();
+    qDebug() << QString("      Total progress %1 / %2 (%3)").arg(copier.totalProgress()/1024).arg(copier.totalSize()/1024).arg(100*copier.totalProgress()/copier.totalSize()).toLatin1().data();
 }
 
 void NotificationTest::onError(QFileCopier::Error error, bool stopped)

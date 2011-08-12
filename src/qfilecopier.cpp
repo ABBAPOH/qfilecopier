@@ -34,6 +34,7 @@ QFileCopierThread::QFileCopierThread(QObject *parent) :
     stopRequest = false;
     skipAllRequest = false;
     hasError = true;
+    m_totalProgress = 0;
     m_totalSize = 0;
 }
 
@@ -73,6 +74,12 @@ Request QFileCopierThread::request(int id) const
 {
     QReadLocker l(&lock);
     return requests.value(id);
+}
+
+qint64 QFileCopierThread::totalProgress() const
+{
+    QReadLocker l(&lock);
+    return m_totalProgress;
 }
 
 qint64 QFileCopierThread::totalSize() const
@@ -242,7 +249,7 @@ void QFileCopierThread::createRequest(Task t)
 
 bool QFileCopierThread::shouldOverwrite(const Request &r)
 {
-    return r.overwrite || overwriteAllRequest || r.copyFlags | QFileCopier::Force;
+    return r.overwrite || overwriteAllRequest || (r.copyFlags | QFileCopier::Force);
 }
 
 bool QFileCopierThread::checkRequest(int id)
@@ -408,48 +415,51 @@ bool QFileCopierThread::copy(const Request &r, QFileCopier::Error *err)
 
         qint64 totalBytesWritten = 0;
         qint64 totalFileSize = sourceFile.size();
-        qint64 prevTotalFileSize = 0;
+        qint64 prevTotalFileSize = totalFileSize;
+        qint64 totalProgress = 0;
 
-        while (true) {
-            // todo: buffersize + char buffer
-            // check error while reading
-            qint64 lenRead = sourceFile.read(buffer.data(), bufferSize);
-            if (lenRead == 0) {
-                emit progress(totalBytesWritten, totalFileSize);
-                break;
-            }
+        qint64 lenRead = 0;
+        do {
 
-            if (lenRead == -1) {
-                *err = QFileCopier::CannotReadSourceFile;
-                return false;
-            }
+            lenRead = sourceFile.read(buffer.data(), bufferSize);
+            if (lenRead != 0) {
 
-            qint64 lenWritten = 0;
-            while (lenWritten < lenRead) {
-                qint64 tmpLenWritten = destFile.write(buffer.data() + lenWritten, lenRead - lenWritten);
-                if (tmpLenWritten == -1) {
-                    *err = QFileCopier::CannotWriteDestinationFile;
+                if (lenRead == -1) {
+                    *err = QFileCopier::CannotReadSourceFile;
                     return false;
                 }
-                lenWritten += tmpLenWritten;
+
+                qint64 lenWritten = 0;
+                while (lenWritten < lenRead) {
+                    qint64 tmpLenWritten = destFile.write(buffer.data() + lenWritten, lenRead - lenWritten);
+                    if (tmpLenWritten == -1) {
+                        *err = QFileCopier::CannotWriteDestinationFile;
+                        return false;
+                    }
+                    lenWritten += tmpLenWritten;
+                }
+
+                totalBytesWritten += lenWritten;
+                totalProgress += lenWritten;
+                if (totalFileSize < totalBytesWritten) {
+                    totalFileSize = totalBytesWritten;
+                }
             }
 
-            totalBytesWritten += lenWritten;
-            if (totalFileSize < totalBytesWritten) {
-                totalFileSize = totalBytesWritten;
-            }
-
-            if (shouldEmitProgress) {
+            if (shouldEmitProgress || lenRead == 0) { // we need to emit signal at end of loop
                 {
                     QWriteLocker l(&lock);
-                    requests[requestStack.pop()].size = totalFileSize;
+                    requests[requestStack.top()].size = totalFileSize;
                     m_totalSize += totalFileSize - prevTotalFileSize;
+                    m_totalProgress += totalProgress;
+                    totalProgress = 0;
                     prevTotalFileSize = totalFileSize;
                 }
                 shouldEmitProgress = false;
                 emit progress(totalBytesWritten, totalFileSize);
             }
-        }
+
+        } while (lenRead != 0);
 
     }
 
@@ -738,6 +748,11 @@ int QFileCopier::currentId() const
 qint64 QFileCopier::size(int id) const
 {
     return d_func()->thread->request(id).size;
+}
+
+qint64 QFileCopier::totalProgress() const
+{
+    return d_func()->thread->totalProgress();
 }
 
 qint64 QFileCopier::totalSize() const

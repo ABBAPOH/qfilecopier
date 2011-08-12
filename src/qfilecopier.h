@@ -74,6 +74,8 @@ public:
     QList<int> entryList(int id) const;
     int currentId() const;
     qint64 size(int id) const;
+
+    qint64 totalProgress() const;
     qint64 totalSize() const;
 
     Stage stage() const;
