@@ -33,6 +33,7 @@ QFileCopierThread::QFileCopierThread(QObject *parent) :
     shouldEmitProgress = false;
     stopRequest = false;
     skipAllRequest = false;
+    cancelAllRequest = false;
     hasError = true;
     m_totalProgress = 0;
     m_totalSize = 0;
@@ -324,7 +325,10 @@ int QFileCopierThread::addDirToQueue(const Task &task)
     if (!checkRequest(id))
         return -1;
 
-    if (!(r.copyFlags & QFileCopier::CopyOnMove) || r.type == Task::Link) {
+    if (r.type == Task::Move && !(r.copyFlags & QFileCopier::CopyOnMove)) {
+        return id;
+    }
+    if (r.type == Task::Link) {
         return id;
     }
 
