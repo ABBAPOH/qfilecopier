@@ -82,6 +82,7 @@ void NotificationTest::initTest()
 void NotificationTest::testCopy()
 {
     qDebug() << "testCopy";
+    QDir().mkpath(tempFolder + "/folder2/folder1");
     copier.copy(tempFolder + "/folder1", tempFolder + "/folder2");
 }
 
@@ -158,7 +159,10 @@ void NotificationTest::onError(QFileCopier::Error error, bool stopped)
     Q_ASSERT_X(QThread::currentThread() == qApp->thread(), "NotificationTest::onProgress", "slot invoked from wrong thread");
     qDebug() << "      Error occured for request" << copier.currentId() << error << "stopped ="<< stopped;
 
-    copier.skip();
+    if (error == QFileCopier::DestinationExists)
+        copier.overwrite();
+    else
+        copier.skip();
 }
 
 int main(int argc, char *argv[])
@@ -169,10 +173,10 @@ int main(int argc, char *argv[])
     t.initTest();
 
     t.testCopy();
-    t.testMove();
-    t.testRename();
-    t.testLink();
-    t.testRename();
+//    t.testMove();
+//    t.testRename();
+//    t.testLink();
+//    t.testRename();
 
     return a.exec();
 }

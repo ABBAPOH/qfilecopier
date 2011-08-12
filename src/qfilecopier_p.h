@@ -26,7 +26,7 @@ struct Task
 
 struct Request : public Task
 {
-    Request() : isDir(false), canceled(false) {}
+    Request() : isDir(false), canceled(false), overwrite(false) {}
 
     bool isDir;
     QList<int> childRequests;

@@ -8,6 +8,23 @@
 Q_DECLARE_METATYPE(QFileCopier::Stage)
 Q_DECLARE_METATYPE(QFileCopier::Error)
 
+bool removePath(const QString &path)
+{
+    bool result = true;
+    QFileInfo info(path);
+    if (info.isDir()) {
+        QDir dir(path);
+        foreach (const QString &entry, dir.entryList(QDir::AllDirs | QDir::Files | QDir::Hidden | QDir::NoDotAndDotDot)) {
+            result &= removePath(dir.absoluteFilePath(entry));
+        }
+        if (!info.dir().rmdir(info.fileName()))
+            return false;
+    } else {
+        result = QFile::remove(path);
+    }
+    return result;
+}
+
 QFileCopierThread::QFileCopierThread(QObject *parent) :
     QThread(parent),
     lock(QReadWriteLock::Recursive)
@@ -226,13 +243,14 @@ bool QFileCopierThread::checkRequest(int id)
     QFileCopier::Error err = QFileCopier::NoError;
     while (!done) {
         Request r = request(id);
+        err = QFileCopier::NoError;
 
         if (r.canceled) {
             done = true;
             err = QFileCopier::Canceled;
         } else if (!QFileInfo(r.source).exists()) {
             err = QFileCopier::SourceNotExists;
-        } else if (QFileInfo(r.dest).exists()) {
+        } else if (!(r.overwrite || overwriteAllRequest) && QFileInfo(r.dest).exists()) {
             err = QFileCopier::DestinationExists;
         } else {
             done = true;
@@ -366,15 +384,6 @@ bool QFileCopierThread::copy(const Request &r, QFileCopier::Error *err)
 
         QFile destFile(r.dest);
         bool result = destFile.open(QFile::WriteOnly);
-        if (!result) {
-            if (r.overwrite || overwriteAllRequest) {
-                result = destFile.remove();
-                if (!result) {
-                    *err = QFileCopier::CannotRemoveDestinationFile;
-                }
-            }
-        }
-        result = destFile.open(QFile::WriteOnly);
         if (!result) {
             *err = QFileCopier::CannotOpenDestinationFile;
             return false;
@@ -513,6 +522,16 @@ bool QFileCopierThread::processRequest(const Request &r, QFileCopier::Error *err
 //        *err = QFileCopier::SourceNotExists;
 //        return false;
 //    }
+
+    if (r.overwrite || overwriteAllRequest) {
+        if (QFileInfo(r.dest).exists()) {
+            bool result = removePath(r.dest);
+            if (!result) {
+                *err = QFileCopier::CannotRemoveDestinationFile;
+                return false;
+            }
+        }
+    }
 
     switch (r.type) {
     case Task::Copy :
@@ -768,11 +787,12 @@ void QFileCopier::retry()
 
 void QFileCopier::overwrite()
 {
-
+    d_func()->thread->overwrite();
 }
 
 void QFileCopier::overwriteAll()
 {
+    d_func()->thread->overwriteAll();
 }
 
 void QFileCopier::reset()
