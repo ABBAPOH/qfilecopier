@@ -103,8 +103,8 @@ public slots:
     void resetSkip();
     void resetOverwrite();
 
-//    void merge();
-//    void mergeAll();
+    void merge();
+    void mergeAll();
 
 signals:
     void error(QFileCopier::Error error, bool stopped);

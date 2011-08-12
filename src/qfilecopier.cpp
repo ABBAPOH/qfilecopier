@@ -34,6 +34,7 @@ QFileCopierThread::QFileCopierThread(QObject *parent) :
     stopRequest = false;
     skipAllRequest = false;
     cancelAllRequest = false;
+    mergeAllRequest = false;
     hasError = true;
     m_totalProgress = 0;
     m_totalSize = 0;
@@ -187,6 +188,31 @@ void QFileCopierThread::resetOverwrite()
     overwriteAllRequest = true;
 }
 
+void QFileCopierThread::merge()
+{
+    QWriteLocker l(&lock);
+    if (!waitingForInteraction)
+        return;
+
+    int requestId = requestStack.top();
+    if (requests[requestId].isDir) {
+        requests[requestId].merge = true;
+        waitingForInteraction = false;
+        interactionCondition.wakeOne();
+    }
+}
+
+void QFileCopierThread::mergeAll()
+{
+    QWriteLocker l(&lock);
+    if (!waitingForInteraction)
+        return;
+
+    mergeAllRequest = true;
+    waitingForInteraction = false;
+    interactionCondition.wakeOne();
+}
+
 void QFileCopierThread::run()
 {
     bool stop = false;
@@ -253,6 +279,11 @@ bool QFileCopierThread::shouldOverwrite(const Request &r)
     return r.overwrite || overwriteAllRequest || (r.copyFlags | QFileCopier::Force);
 }
 
+bool QFileCopierThread::shouldMerge(const Request &r)
+{
+    return r.merge || mergeAllRequest /*|| (r.copyFlags | QFileCopier::Merge)*/;
+}
+
 bool QFileCopierThread::checkRequest(int id)
 {
     lock.lockForWrite();
@@ -270,7 +301,7 @@ bool QFileCopierThread::checkRequest(int id)
             err = QFileCopier::Canceled;
         } else if (!QFileInfo(r.source).exists()) {
             err = QFileCopier::SourceNotExists;
-        } else if (!shouldOverwrite(r) && QFileInfo(r.dest).exists()) {
+        } else if (!shouldOverwrite(r) && shouldMerge(r) && QFileInfo(r.dest).exists()) {
             err = QFileCopier::DestinationExists;
         } else {
             done = true;
@@ -386,85 +417,114 @@ bool QFileCopierThread::interact(const Request &r, bool done, QFileCopier::Error
     return done;
 }
 
-bool QFileCopierThread::copy(const Request &r, QFileCopier::Error *err)
-{
-    if (r.isDir) {
+/*!
+  \internal
 
+    Creates dir if necessary; throws error if fails
+*/
+bool QFileCopierThread::createDir(const Request &r, QFileCopier::Error *err)
+{
+//        if (!shouldMerge(r) && !QDir().mkpath(r.dest)) {
+//            *err = QFileCopier::CannotCreateDestinationDirectory;
+//            return false;
+//        }
+//        if (shouldMerge(r) && !QFileInfo(r.dest).exists() && !QDir().mkpath(r.dest)) {
+//            *err = QFileCopier::CannotCreateDestinationDirectory;
+//            return false;
+//        }
+
+    if (!(shouldMerge(r) && QFileInfo(r.dest).exists())) {
         if (!QDir().mkpath(r.dest)) {
             *err = QFileCopier::CannotCreateDestinationDirectory;
             return false;
         }
+    }
+
+    return true;
+}
+
+bool QFileCopierThread::copyFile(const Request &r, QFileCopier::Error *err)
+{
+    QFile sourceFile(r.source);
+    if (!sourceFile.open(QFile::ReadOnly)) {
+        *err = QFileCopier::CannotOpenSourceFile;
+        return false;
+    }
+
+    QFile destFile(r.dest);
+    bool result = destFile.open(QFile::WriteOnly);
+    if (!result) {
+        *err = QFileCopier::CannotOpenDestinationFile;
+        return false;
+    }
+
+    const int bufferSize = 4*1024; // 4 Kb
+    QScopedArrayPointer<char> buffer(new char[bufferSize]);
+
+    qint64 totalBytesWritten = 0;
+    qint64 totalFileSize = sourceFile.size();
+    qint64 prevTotalFileSize = totalFileSize;
+    qint64 totalProgress = 0;
+
+    qint64 lenRead = 0;
+    do {
+
+        lenRead = sourceFile.read(buffer.data(), bufferSize);
+        if (lenRead != 0) {
+
+            if (lenRead == -1) {
+                *err = QFileCopier::CannotReadSourceFile;
+                return false;
+            }
+
+            qint64 lenWritten = 0;
+            while (lenWritten < lenRead) {
+                qint64 tmpLenWritten = destFile.write(buffer.data() + lenWritten, lenRead - lenWritten);
+                if (tmpLenWritten == -1) {
+                    *err = QFileCopier::CannotWriteDestinationFile;
+                    return false;
+                }
+                lenWritten += tmpLenWritten;
+            }
+
+            totalBytesWritten += lenWritten;
+            totalProgress += lenWritten;
+            if (totalFileSize < totalBytesWritten) {
+                totalFileSize = totalBytesWritten;
+            }
+        }
+
+        if (shouldEmitProgress || lenRead == 0) { // we need to emit signal at end of loop
+            {
+                QWriteLocker l(&lock);
+                requests[requestStack.top()].size = totalFileSize;
+                m_totalSize += totalFileSize - prevTotalFileSize;
+                m_totalProgress += totalProgress;
+                totalProgress = 0;
+                prevTotalFileSize = totalFileSize;
+            }
+            shouldEmitProgress = false;
+            emit progress(totalBytesWritten, totalFileSize);
+        }
+
+    } while (lenRead != 0);
+
+    return true;
+}
+
+bool QFileCopierThread::copy(const Request &r, QFileCopier::Error *err)
+{
+    if (r.isDir) {
+
+        if (!createDir(r, err))
+            return false;
 
         foreach (int id, r.childRequests) {
             handle(id);
         }
 
     } else {
-
-        QFile sourceFile(r.source);
-        if (!sourceFile.open(QFile::ReadOnly)) {
-            *err = QFileCopier::CannotOpenSourceFile;
-            return false;
-        }
-
-        QFile destFile(r.dest);
-        bool result = destFile.open(QFile::WriteOnly);
-        if (!result) {
-            *err = QFileCopier::CannotOpenDestinationFile;
-            return false;
-        }
-
-        const int bufferSize = 4*1024; // 4 Kb
-        QScopedArrayPointer<char> buffer(new char[bufferSize]);
-
-        qint64 totalBytesWritten = 0;
-        qint64 totalFileSize = sourceFile.size();
-        qint64 prevTotalFileSize = totalFileSize;
-        qint64 totalProgress = 0;
-
-        qint64 lenRead = 0;
-        do {
-
-            lenRead = sourceFile.read(buffer.data(), bufferSize);
-            if (lenRead != 0) {
-
-                if (lenRead == -1) {
-                    *err = QFileCopier::CannotReadSourceFile;
-                    return false;
-                }
-
-                qint64 lenWritten = 0;
-                while (lenWritten < lenRead) {
-                    qint64 tmpLenWritten = destFile.write(buffer.data() + lenWritten, lenRead - lenWritten);
-                    if (tmpLenWritten == -1) {
-                        *err = QFileCopier::CannotWriteDestinationFile;
-                        return false;
-                    }
-                    lenWritten += tmpLenWritten;
-                }
-
-                totalBytesWritten += lenWritten;
-                totalProgress += lenWritten;
-                if (totalFileSize < totalBytesWritten) {
-                    totalFileSize = totalBytesWritten;
-                }
-            }
-
-            if (shouldEmitProgress || lenRead == 0) { // we need to emit signal at end of loop
-                {
-                    QWriteLocker l(&lock);
-                    requests[requestStack.top()].size = totalFileSize;
-                    m_totalSize += totalFileSize - prevTotalFileSize;
-                    m_totalProgress += totalProgress;
-                    totalProgress = 0;
-                    prevTotalFileSize = totalFileSize;
-                }
-                shouldEmitProgress = false;
-                emit progress(totalBytesWritten, totalFileSize);
-            }
-
-        } while (lenRead != 0);
-
+        return copyFile(r, err);
     }
 
     return true;
@@ -478,10 +538,8 @@ bool QFileCopierThread::move(const Request &r, QFileCopier::Error *err)
 
         if (r.isDir) {
 
-            if (!QDir().mkpath(r.dest)) {
-                *err = QFileCopier::CannotCreateDestinationDirectory;
+            if (!createDir(r, err))
                 return false;
-            }
 
             foreach (int id, r.childRequests) {
                 handle(id);
@@ -493,7 +551,7 @@ bool QFileCopierThread::move(const Request &r, QFileCopier::Error *err)
             }
 
         } else {
-            result = copy(r, err);
+            result = copyFile(r, err);
             if (result)
                 result = remove(r, err);
         }
@@ -852,4 +910,14 @@ void QFileCopier::resetSkip()
 void QFileCopier::resetOverwrite()
 {
     d_func()->thread->resetOverwrite();
+}
+
+void QFileCopier::merge()
+{
+    d_func()->thread->merge();
+}
+
+void QFileCopier::mergeAll()
+{
+    d_func()->thread->mergeAll();
 }
