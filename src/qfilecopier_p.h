@@ -30,6 +30,7 @@ struct Request : public Task
 
     bool isDir;
     QList<int> childRequests;
+    qint64 size;
 
     bool canceled;
     bool overwrite;
@@ -53,6 +54,8 @@ public:
     void setStage(QFileCopier::Stage);
 
     Request request(int id) const;
+
+    qint64 totalSize() const;
 
     void emitProgress();
 
@@ -112,6 +115,7 @@ private:
     bool cancelAllRequest;
     bool hasError;
     bool overwriteAllRequest;
+    qint64 m_totalSize;
 };
 
 class QFileCopierPrivate : public QObject

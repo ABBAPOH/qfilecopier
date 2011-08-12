@@ -73,6 +73,8 @@ public:
     bool isDir(int id) const;
     QList<int> entryList(int id) const;
     int currentId() const;
+    qint64 size(int id) const;
+    qint64 totalSize() const;
 
     Stage stage() const;
     State state() const;

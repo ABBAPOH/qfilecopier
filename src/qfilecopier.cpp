@@ -34,6 +34,7 @@ QFileCopierThread::QFileCopierThread(QObject *parent) :
     stopRequest = false;
     skipAllRequest = false;
     hasError = true;
+    m_totalSize = 0;
 }
 
 QFileCopierThread::~QFileCopierThread()
@@ -72,6 +73,12 @@ Request QFileCopierThread::request(int id) const
 {
     QReadLocker l(&lock);
     return requests.value(id);
+}
+
+qint64 QFileCopierThread::totalSize() const
+{
+    QReadLocker l(&lock);
+    return m_totalSize;
 }
 
 void QFileCopierThread::emitProgress()
@@ -279,8 +286,10 @@ int QFileCopierThread::addFileToQueue(const Task & task)
     r.dest = task.dest;
     r.copyFlags = task.copyFlags;
     r.isDir = false;
+    r.size = QFileInfo(r.source).size();
 
     lock.lockForWrite();
+    m_totalSize += r.size;
     int id = requests.size();
     requests.append(r);
     lock.unlock();
@@ -399,6 +408,7 @@ bool QFileCopierThread::copy(const Request &r, QFileCopier::Error *err)
 
         qint64 totalBytesWritten = 0;
         qint64 totalFileSize = sourceFile.size();
+        qint64 prevTotalFileSize = 0;
 
         while (true) {
             // todo: buffersize + char buffer
@@ -430,7 +440,12 @@ bool QFileCopierThread::copy(const Request &r, QFileCopier::Error *err)
             }
 
             if (shouldEmitProgress) {
-                //todo : update size in request
+                {
+                    QWriteLocker l(&lock);
+                    requests[requestStack.pop()].size = totalFileSize;
+                    m_totalSize += totalFileSize - prevTotalFileSize;
+                    prevTotalFileSize = totalFileSize;
+                }
                 shouldEmitProgress = false;
                 emit progress(totalBytesWritten, totalFileSize);
             }
@@ -718,6 +733,16 @@ QList<int> QFileCopier::entryList(int id) const
 int QFileCopier::currentId() const
 {
     return d_func()->thread->currentId();
+}
+
+qint64 QFileCopier::size(int id) const
+{
+    return d_func()->thread->request(id).size;
+}
+
+qint64 QFileCopier::totalSize() const
+{
+    return d_func()->thread->totalSize();
 }
 
 QFileCopier::Stage QFileCopier::stage() const
