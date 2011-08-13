@@ -17,6 +17,8 @@
 struct Task
 {
     enum Type { Copy, Move, Remove, Link };
+    Task() : copyFlags(0) {}
+    Task(const Task &t) : type(t.type), source(t.source), dest(t.dest), copyFlags(t.copyFlags) {}
 
     Type type;
     QString source;
@@ -26,7 +28,11 @@ struct Task
 
 struct Request : public Task
 {
-    Request() : isDir(false), canceled(false), overwrite(false), merge(false) {}
+    Request() :
+        isDir(false), size(0), canceled(false), overwrite(false), merge(false) {}
+    explicit Request(const Task &t) :
+        Task(t),
+        isDir(false), size(0), canceled(false), overwrite(false), merge(false) {}
 
     bool isDir;
     QList<int> childRequests;

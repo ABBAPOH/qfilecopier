@@ -319,11 +319,7 @@ bool QFileCopierThread::checkRequest(int id)
 
 int QFileCopierThread::addFileToQueue(const Task & task)
 {
-    Request r;
-    r.type = task.type;
-    r.source = task.source;
-    r.dest = task.dest;
-    r.copyFlags = task.copyFlags;
+    Request r(task);
     r.isDir = false;
     r.size = QFileInfo(r.source).size();
 
@@ -341,11 +337,7 @@ int QFileCopierThread::addFileToQueue(const Task & task)
 
 int QFileCopierThread::addDirToQueue(const Task &task)
 {
-    Request r;
-    r.type = task.type;
-    r.source = task.source;
-    r.dest = task.dest;
-    r.copyFlags = task.copyFlags;
+    Request r(task);
     r.isDir = true;
 
     lock.lockForWrite();
