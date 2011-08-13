@@ -264,12 +264,7 @@ void QFileCopierThread::createRequest(Task t)
     }
 #endif
 
-    int index = -1;
-    if (sourceInfo.isDir())
-        index = addDirToQueue(t);
-    else
-        index = addFileToQueue(t);
-
+    int index = addRequestToQueue(Request(t));
     if (index != -1)
         requestQueue.append(index);
 }
@@ -291,7 +286,7 @@ bool QFileCopierThread::checkRequest(int id)
     lock.unlock();
 
     bool done = false;
-    QFileCopier::Error err = QFileCopier::NoError;
+    QFileCopier::Error err;
     while (!done) {
         Request r = request(id);
         err = QFileCopier::NoError;
@@ -317,68 +312,51 @@ bool QFileCopierThread::checkRequest(int id)
     return err == QFileCopier::NoError;
 }
 
-int QFileCopierThread::addFileToQueue(const Task & task)
+int QFileCopierThread::addRequestToQueue(Request request)
 {
-    Request r(task);
-    r.isDir = false;
-    r.size = QFileInfo(r.source).size();
+    int id = -1;
+    // first we need ot check if info exists... damn
+    QFileInfo sourceInfo(request.source);
+    request.isDir = sourceInfo.isDir();
+    request.size = request.isDir ? 0 : sourceInfo.size();
 
-    lock.lockForWrite();
-    m_totalSize += r.size;
-    int id = requests.size();
-    requests.append(r);
-    lock.unlock();
+    {
+        QWriteLocker l(&lock);
+        m_totalSize += request.size;
+        id = requests.size();
+        requests.append(request);
+    }
 
     if (!checkRequest(id))
         return -1;
 
-    return id;
-}
+    if (request.isDir) {
+        if (request.type == Task::Move && !(request.copyFlags & QFileCopier::CopyOnMove)) {
+            return id;
+        }
+        if (request.type == Task::Link) {
+            return id;
+        }
 
-int QFileCopierThread::addDirToQueue(const Task &task)
-{
-    Request r(task);
-    r.isDir = true;
+        QList<int> childRequests;
 
-    lock.lockForWrite();
-    requests.append(r);
-    int id = requests.size() - 1;
-    lock.unlock();
+        QDirIterator i(request.source, QDir::AllEntries | QDir::Hidden | QDir::NoDotAndDotDot);
+        while (i.hasNext()) {
+            QString source = i.next();
 
-    if (!checkRequest(id))
-        return -1;
+            Request r;
+            r.type = request.type;
+            r.source = source;
+            r.dest = request.dest + "/" + QFileInfo(source).fileName();
+            r.copyFlags = request.copyFlags;
 
-    if (r.type == Task::Move && !(r.copyFlags & QFileCopier::CopyOnMove)) {
-        return id;
+            int index = addRequestToQueue(r);
+            if (index != -1)
+                childRequests.append(index);
+        }
+
+        requests[id].childRequests = childRequests; // atomic assign
     }
-    if (r.type == Task::Link) {
-        return id;
-    }
-
-    QList<int> childRequests;
-
-    QDirIterator i(r.source, QDir::AllEntries | QDir::Hidden | QDir::NoDotAndDotDot);
-    while (i.hasNext()) {
-        QString source = i.next();
-        QFileInfo sourceInfo(source);
-
-        Task t;
-        t.type = r.type;
-        t.source = source;
-        t.dest = r.dest + "/" + sourceInfo.fileName();
-        t.copyFlags = r.copyFlags;
-
-        int index = -1;
-        if (sourceInfo.isDir())
-            index = addDirToQueue(t);
-        else
-            index = addFileToQueue(t);
-        if (index != -1)
-            childRequests.append(index);
-    }
-
-//    QWriteLocker l(&lock); // i think no need as QList hac atomic int within
-    requests[id].childRequests = childRequests;
 
     return id;
 }

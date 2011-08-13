@@ -99,8 +99,7 @@ private:
     bool shouldOverwrite(const Request &r);
     bool shouldMerge(const Request &r);
     bool checkRequest(int id);
-    int addFileToQueue(const Task &r);
-    int addDirToQueue(const Task &r);
+    int addRequestToQueue(Request r);
     bool interact(const Request &r, bool done, QFileCopier::Error err);
     bool createDir(const Request &r, QFileCopier::Error *err);
     bool copyFile(const Request &r, QFileCopier::Error *err);
