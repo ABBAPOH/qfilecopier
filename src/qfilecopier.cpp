@@ -323,7 +323,16 @@ bool QFileCopierThread::checkRequest(int id)
 int QFileCopierThread::addRequestToQueue(Request request)
 {
     int id = -1;
-    // first we need ot check if info exists... damn
+
+    {
+        QWriteLocker l(&lock);
+        id = requests.size();
+        requests.append(request);
+    }
+
+    if (!checkRequest(id))
+        return -1;
+
     QFileInfo sourceInfo(request.source);
     request.isDir = sourceInfo.isDir();
     request.size = request.isDir ? 0 : sourceInfo.size();
@@ -331,12 +340,8 @@ int QFileCopierThread::addRequestToQueue(Request request)
     {
         QWriteLocker l(&lock);
         m_totalSize += request.size;
-        id = requests.size();
-        requests.append(request);
+        requests[id] = request; // refresh request
     }
-
-    if (!checkRequest(id))
-        return -1;
 
     if (request.isDir) {
         if (request.type == Task::Move && !(request.copyFlags & QFileCopier::CopyOnMove)) {
