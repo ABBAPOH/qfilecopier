@@ -252,10 +252,18 @@ void QFileCopierThread::createRequest(Task t)
 {
     QFileInfo sourceInfo(t.source);
     QFileInfo destInfo(t.dest);
-    if (destInfo.exists() && destInfo.isDir() && destInfo.fileName() != sourceInfo.fileName() && !t.dest.endsWith(QLatin1Char('/')))
+
+    t.source = sourceInfo.absoluteFilePath();
+
+    if (destInfo.exists() && destInfo.isDir() && destInfo.fileName() != sourceInfo.fileName() || t.dest.endsWith(QLatin1Char('/'))) {
+        if (!destInfo.exists())
+            QDir().mkpath(destInfo.absoluteFilePath());
         t.dest = destInfo.absoluteFilePath() + "/" + sourceInfo.fileName();
+    } else
+        t.dest = destInfo.absoluteFilePath();
 
     t.dest = QDir::cleanPath(t.dest);
+    t.source = QDir::cleanPath(t.source);
 
 #ifdef Q_OS_WIN
     if (t.type == Task::Link) {
@@ -271,12 +279,12 @@ void QFileCopierThread::createRequest(Task t)
 
 bool QFileCopierThread::shouldOverwrite(const Request &r)
 {
-    return r.overwrite || overwriteAllRequest || (r.copyFlags | QFileCopier::Force);
+    return r.overwrite || overwriteAllRequest || (r.copyFlags & QFileCopier::Force);
 }
 
 bool QFileCopierThread::shouldMerge(const Request &r)
 {
-    return r.merge || mergeAllRequest /*|| (r.copyFlags | QFileCopier::Merge)*/;
+    return r.merge || mergeAllRequest /*|| (r.copyFlags & QFileCopier::Merge)*/;
 }
 
 bool QFileCopierThread::checkRequest(int id)

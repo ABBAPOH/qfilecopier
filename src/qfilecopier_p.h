@@ -16,8 +16,8 @@
 
 struct Task
 {
-    enum Type { Copy, Move, Remove, Link };
-    Task() : copyFlags(0) {}
+    enum Type { NoType = -1, Copy, Move, Remove, Link };
+    Task() : type(NoType), copyFlags(0) {}
     Task(const Task &t) : type(t.type), source(t.source), dest(t.dest), copyFlags(t.copyFlags) {}
 
     Type type;
