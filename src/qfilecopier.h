@@ -10,7 +10,8 @@ class QFILECOPIERSHARED_EXPORT QFileCopier : public QObject
 {
     Q_OBJECT
     Q_PROPERTY(int progressInterval READ progressInterval WRITE setProgressInterval)
-//    Q_PROPERTY(bool autoReset READ autoReset WRITE setAutoReset)
+    Q_PROPERTY(bool autoReset READ autoReset WRITE setAutoReset)
+
 public:
     explicit QFileCopier(QObject *parent = 0);
     ~QFileCopier();
@@ -81,8 +82,8 @@ public:
     Stage stage() const;
     State state() const;
 
-//    void setAutoReset(bool on);
-//    bool autoReset() const;
+    void setAutoReset(bool on);
+    bool autoReset() const;
     int progressInterval() const;
     void setProgressInterval(int ms);
 

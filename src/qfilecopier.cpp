@@ -38,6 +38,7 @@ QFileCopierThread::QFileCopierThread(QObject *parent) :
     hasError = true;
     m_totalProgress = 0;
     m_totalSize = 0;
+    autoReset = true;
 }
 
 QFileCopierThread::~QFileCopierThread()
@@ -88,6 +89,12 @@ qint64 QFileCopierThread::totalSize() const
 {
     QReadLocker l(&lock);
     return m_totalSize;
+}
+
+void QFileCopierThread::setAutoReset(bool on)
+{
+    QWriteLocker l(&lock);
+    autoReset = on;
 }
 
 void QFileCopierThread::emitProgress()
@@ -246,6 +253,14 @@ void QFileCopierThread::run()
     emit done(hasError);
     hasError = false;
     setStage(QFileCopier::NoStage);
+
+    if (autoReset) {
+        hasError = false;
+        overwriteAllRequest = false;
+        mergeAllRequest = false;
+        skipAllRequest = false;
+        skipAllError.clear();
+    }
 }
 
 void QFileCopierThread::createRequest(Task t)
@@ -813,6 +828,18 @@ QFileCopier::Stage QFileCopier::stage() const
 QFileCopier::State QFileCopier::state() const
 {
     return d_func()->state;
+}
+
+bool QFileCopier::autoReset() const
+{
+    return d_func()->autoReset;
+}
+
+void QFileCopier::setAutoReset(bool on)
+{
+    Q_D(QFileCopier);
+    d->autoReset = on;
+    d->thread->setAutoReset(on);
 }
 
 void QFileCopierPrivate::setState(QFileCopier::State s)

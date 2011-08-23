@@ -65,6 +65,8 @@ public:
     qint64 totalProgress() const;
     qint64 totalSize() const;
 
+    void setAutoReset(bool on);
+
     void emitProgress();
 
     void cancel();
@@ -131,6 +133,7 @@ private:
     bool mergeAllRequest;
     qint64 m_totalProgress;
     qint64 m_totalSize;
+    bool autoReset;
 };
 
 class QFileCopierPrivate : public QObject
@@ -145,6 +148,7 @@ public:
     QFileCopier::State state;
     int progressTimerId;
     int progressInterval;
+    bool autoReset;
 
     void enqueueOperation(Task::Type operationType, const QStringList &sourcePaths,
                           const QString &destinationPath, QFileCopier::CopyFlags flags);
