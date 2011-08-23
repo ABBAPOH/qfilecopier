@@ -68,7 +68,7 @@ public:
     void remove(const QString &path, CopyFlags flags = 0);
     void remove(const QStringList &paths, CopyFlags flags = 0);
 
-//    QList<int> pendingRequests() const;
+    QList<int> pendingRequests() const;
     QString sourceFilePath(int id) const;
     QString destinationFilePath(int id) const;
     bool isDir(int id) const;

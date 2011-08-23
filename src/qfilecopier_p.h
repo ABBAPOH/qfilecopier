@@ -55,6 +55,8 @@ public:
 
     void enqueueTaskList(const QList<Task> &list);
 
+    QList<int> pendingRequests(int id) const;
+
     QFileCopier::Stage stage() const;
     void setStage(QFileCopier::Stage);
 

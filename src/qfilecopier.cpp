@@ -54,6 +54,20 @@ void QFileCopierThread::enqueueTaskList(const QList<Task> &list)
     taskQueue.append(list);
 }
 
+QList<int> QFileCopierThread::pendingRequests(int id) const
+{
+    int size = 0;
+    {
+        QReadLocker l(&lock);
+        size = requests.size();
+    }
+    QList<int> result;
+    for ( ; id < size; id++) {
+        result.append(id);
+    }
+    return result;
+}
+
 QFileCopier::Stage QFileCopierThread::stage() const
 {
     return m_stage;
@@ -774,6 +788,11 @@ void QFileCopier::remove(const QString &path, CopyFlags flags)
 void QFileCopier::remove(const QStringList &paths, CopyFlags flags)
 {
     d_func()->enqueueOperation(Task::Remove, paths, QString(), flags);
+}
+
+QList<int> QFileCopier::pendingRequests() const
+{
+    return d_func()->thread->pendingRequests(currentId());
 }
 
 QString QFileCopier::sourceFilePath(int id) const
