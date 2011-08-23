@@ -8,7 +8,7 @@
 Q_DECLARE_METATYPE(QFileCopier::Stage)
 Q_DECLARE_METATYPE(QFileCopier::Error)
 
-bool removePath(const QString &path)
+static bool removePath(const QString &path)
 {
     bool result = true;
     QFileInfo info(path);
