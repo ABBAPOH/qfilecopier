@@ -39,21 +39,13 @@ QFileCopierThread::QFileCopierThread(QObject *parent) :
     m_totalProgress = 0;
     m_totalSize = 0;
     autoReset = true;
+    m_currentId = -1;
 }
 
 QFileCopierThread::~QFileCopierThread()
 {
     // todo: stop operations
     wait();
-}
-
-int QFileCopierThread::currentId()
-{
-    QReadLocker l(&lock);
-
-    if (requestStack.isEmpty())
-        return -1;
-    return requestStack.top();
 }
 
 void QFileCopierThread::enqueueTaskList(const QList<Task> &list)
@@ -132,7 +124,7 @@ void QFileCopierThread::skip()
     if (!waitingForInteraction)
         return;
 
-    requests[requestStack.top()].canceled = true;
+    requests[m_currentId].canceled = true;
     waitingForInteraction = false;
     interactionCondition.wakeOne();
 }
@@ -143,7 +135,7 @@ void QFileCopierThread::skipAll()
     if (!waitingForInteraction)
         return;
 
-    int id = requestStack.top();
+    int id = m_currentId;
     requests[id].canceled = true;
     skipAllRequest = true;
     waitingForInteraction = false;
@@ -156,7 +148,7 @@ void QFileCopierThread::overwrite()
     if (!waitingForInteraction)
         return;
 
-    overwriteChildren(requestStack.top());
+    overwriteChildren(m_currentId);
     waitingForInteraction = false;
     interactionCondition.wakeOne();
 }
@@ -201,7 +193,7 @@ void QFileCopierThread::merge()
     if (!waitingForInteraction)
         return;
 
-    int requestId = requestStack.top();
+    int requestId = m_currentId;
     if (requests[requestId].isDir) {
         requests[requestId].merge = true;
         waitingForInteraction = false;
@@ -305,7 +297,8 @@ bool QFileCopierThread::shouldMerge(const Request &r)
 bool QFileCopierThread::checkRequest(int id)
 {
     lock.lockForWrite();
-    requestStack.push(id);
+    int parentId = m_currentId;
+    m_currentId = id;
     lock.unlock();
 
     bool done = false;
@@ -329,7 +322,7 @@ bool QFileCopierThread::checkRequest(int id)
     }
 
     lock.lockForWrite();
-    requestStack.pop();
+    m_currentId = parentId;
     lock.unlock();
 
     return err == QFileCopier::NoError;
@@ -495,7 +488,7 @@ bool QFileCopierThread::copyFile(const Request &r, QFileCopier::Error *err)
         if (shouldEmitProgress || lenRead == 0) { // we need to emit signal at end of loop
             {
                 QWriteLocker l(&lock);
-                requests[requestStack.top()].size = totalFileSize;
+                requests[m_currentId].size = totalFileSize;
                 m_totalSize += totalFileSize - prevTotalFileSize;
                 m_totalProgress += totalProgress;
                 totalProgress = 0;
@@ -635,10 +628,11 @@ bool QFileCopierThread::processRequest(const Request &r, QFileCopier::Error *err
 
 void QFileCopierThread::handle(int id)
 {
+    int parentId = m_currentId;
     {
         QWriteLocker l(&lock);
         emit started(id);
-        requestStack.push(id);
+        m_currentId = id;
     }
 
     bool done = false;
@@ -654,7 +648,7 @@ void QFileCopierThread::handle(int id)
 
     {
         QWriteLocker l(&lock);
-        requestStack.pop();
+        m_currentId = parentId;
         emit finished(id);
     }
 }
@@ -687,11 +681,13 @@ void QFileCopierPrivate::startThread()
 
 void QFileCopierPrivate::onStarted(int id)
 {
+    requestStack.push(id);
     emit q_func()->started(id);
 }
 
 void QFileCopierPrivate::onFinished(int id)
 {
+    requestStack.pop();
     emit q_func()->finished(id, false);
 }
 
@@ -802,7 +798,7 @@ QList<int> QFileCopier::entryList(int id) const
 
 int QFileCopier::currentId() const
 {
-    return d_func()->thread->currentId();
+    return d_func()->requestStack.top();
 }
 
 qint64 QFileCopier::size(int id) const
