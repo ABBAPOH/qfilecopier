@@ -41,7 +41,7 @@ private Q_SLOTS:
     void testLink2();
 
 private:
-    void createFiles();
+    void createFiles(const QString &folder);
     bool exists(const QString &folder);
     bool exists(const QString &folder, const QStringList &list);
 
@@ -67,7 +67,7 @@ void QFileCopierTest::initTestCase()
     qDebug() << "remove source:" << removePath(sourceFolder);
     qDebug() << "remove dest:" << removePath(destFolder);
 
-    createFiles();
+    createFiles(sourceFolder);
 }
 
 void QFileCopierTest::cleanupTestCase()
@@ -98,10 +98,7 @@ void QFileCopierTest::testCopy2()
 
 void QFileCopierTest::testRemove()
 {
-    QString oldSourceFolder = sourceFolder;
-    sourceFolder = destFolder;
-    createFiles();
-    sourceFolder = oldSourceFolder;
+    createFiles(destFolder);
 
     copier.remove(destFolder);
     copier.waitForFinished();
@@ -115,7 +112,7 @@ void QFileCopierTest::testMove1()
     copier.waitForFinished();
 
     QVERIFY2(exists(destFolder) && !exists(sourceFolder), "Files were not moved");
-    createFiles();
+    createFiles(sourceFolder);
 }
 
 void QFileCopierTest::testMove2()
@@ -124,7 +121,7 @@ void QFileCopierTest::testMove2()
     copier.waitForFinished();
 
     QVERIFY2(exists(destFolder + "/" + sourceFolder) && !exists(sourceFolder), "Files were not moved");
-    createFiles();
+    createFiles(sourceFolder);
 }
 
 void QFileCopierTest::testLink1()
@@ -145,24 +142,24 @@ void QFileCopierTest::testLink2()
     QVERIFY2(destInfo.exists() && destInfo.isSymLink() && destInfo.symLinkTarget() == QFileInfo(sourceFolder).absoluteFilePath(), "Folder were not linked");
 }
 
-void QFileCopierTest::createFiles()
+void QFileCopierTest::createFiles(const QString &folder)
 {
-    QDir().mkpath(sourceFolder);
+    QDir().mkpath(folder);
 //    QDir().mkpath(destFolder);
     foreach(const QString &dir, dirs) {
-        QVERIFY2(QDir().mkpath(sourceFolder + QLatin1Char('/') + dir), "Cannot create dir");
+        QVERIFY2(QDir().mkpath(folder + QLatin1Char('/') + dir), "Cannot create dir");
     }
-    QVERIFY2(exists(sourceFolder, dirs), "Dirs were not created:)");
+    QVERIFY2(exists(folder, dirs), "Dirs were not created:)");
 
     foreach (const QString &file, files) {
-        QFile f(sourceFolder + QLatin1Char('/') + file);
+        QFile f(folder + QLatin1Char('/') + file);
         QVERIFY2(f.open(QFile::WriteOnly), "Can't open file");
         QByteArray arr(4*1024, 0xfe);
         for (int i = 0; i < 25*1024; i++) {
             f.write(arr);
         }
     }
-    QVERIFY2(exists(sourceFolder, files), "Files were not created:)");
+    QVERIFY2(exists(folder, files), "Files were not created:)");
 }
 
 bool QFileCopierTest::exists(const QString &folder)
