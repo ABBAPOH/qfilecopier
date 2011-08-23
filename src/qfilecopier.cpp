@@ -27,19 +27,20 @@ static bool removePath(const QString &path)
 
 QFileCopierThread::QFileCopierThread(QObject *parent) :
     QThread(parent),
-    lock(QReadWriteLock::Recursive)
+    lock(QReadWriteLock::Recursive),
+    m_currentId(-1),
+    m_stage(QFileCopier::NoStage),
+    shouldEmitProgress(false),
+    waitingForInteraction(false),
+    stopRequest(false),
+    skipAllRequest(false),
+    cancelAllRequest(false),
+    mergeAllRequest(false),
+    hasError(true),
+    m_totalProgress(0),
+    m_totalSize(0),
+    autoReset(true)
 {
-    m_stage = QFileCopier::NoStage;
-    shouldEmitProgress = false;
-    stopRequest = false;
-    skipAllRequest = false;
-    cancelAllRequest = false;
-    mergeAllRequest = false;
-    hasError = true;
-    m_totalProgress = 0;
-    m_totalSize = 0;
-    autoReset = true;
-    m_currentId = -1;
 }
 
 QFileCopierThread::~QFileCopierThread()
@@ -743,6 +744,7 @@ QFileCopier::QFileCopier(QObject *parent) :
 
     d->progressInterval = 500;
     d->progressTimerId = d->startTimer(d->progressInterval);
+    d->autoReset = true;
 }
 
 QFileCopier::~QFileCopier()

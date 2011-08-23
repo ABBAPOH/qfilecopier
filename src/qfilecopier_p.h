@@ -115,22 +115,27 @@ private:
 
 private:
     mutable QReadWriteLock lock;
+
+    int m_currentId;
     QQueue<Task> taskQueue;
     QQueue<int> requestQueue;
     QList<Request> requests;
-    int m_currentId;
 
     volatile QFileCopier::Stage m_stage;
     volatile bool shouldEmitProgress;
-    bool stopRequest;
+
     QWaitCondition interactionCondition;
     bool waitingForInteraction;
+
+    bool stopRequest;
     bool skipAllRequest;
-    QSet<QFileCopier::Error> skipAllError;
     bool cancelAllRequest;
-    bool hasError;
     bool overwriteAllRequest;
     bool mergeAllRequest;
+
+    bool hasError;
+    QSet<QFileCopier::Error> skipAllError;
+
     qint64 m_totalProgress;
     qint64 m_totalSize;
     bool autoReset;
