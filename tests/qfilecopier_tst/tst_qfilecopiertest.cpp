@@ -34,6 +34,7 @@ private Q_SLOTS:
     void cleanup();
     void testCopy1();
     void testCopy2();
+    void testCopy3();
     void testRemove();
     void testMove1();
     void testMove2();
@@ -41,9 +42,10 @@ private Q_SLOTS:
     void testLink2();
 
 private:
-    void createFiles(const QString &folder);
+    void createFiles(const QString &folder, int mb = 100);
     bool exists(const QString &folder);
     bool exists(const QString &folder, const QStringList &list);
+    bool checkFiles(const QString &folder, int expectedSize = 100);
 
 private:
     QString sourceFolder;
@@ -96,6 +98,22 @@ void QFileCopierTest::testCopy2()
     QVERIFY2(exists(destFolder + "/" + sourceFolder), "Files were not copied");
 }
 
+void QFileCopierTest::testCopy3()
+{
+    createFiles(destFolder, 3);
+    QStringList list;
+
+    QDir dir(sourceFolder);
+    foreach (const QString &file, dir.entryList(QDir::AllEntries | QDir::NoDotAndDotDot)) {
+        list.append(dir.absoluteFilePath(file));
+    }
+
+    copier.copy(list, destFolder, QFileCopier::Force);
+    copier.waitForFinished();
+
+    QVERIFY2(checkFiles(destFolder, 100), "Files were not copied");
+}
+
 void QFileCopierTest::testRemove()
 {
     createFiles(destFolder);
@@ -142,7 +160,7 @@ void QFileCopierTest::testLink2()
     QVERIFY2(destInfo.exists() && destInfo.isSymLink() && destInfo.symLinkTarget() == QFileInfo(sourceFolder).absoluteFilePath(), "Folder were not linked");
 }
 
-void QFileCopierTest::createFiles(const QString &folder)
+void QFileCopierTest::createFiles(const QString &folder, int mb)
 {
     QDir().mkpath(folder);
 //    QDir().mkpath(destFolder);
@@ -155,7 +173,7 @@ void QFileCopierTest::createFiles(const QString &folder)
         QFile f(folder + QLatin1Char('/') + file);
         QVERIFY2(f.open(QFile::WriteOnly), "Can't open file");
         QByteArray arr(4*1024, 0xfe);
-        for (int i = 0; i < 25*1024; i++) {
+        for (int i = 0; i < mb*1024/4; i++) {
             f.write(arr);
         }
     }
@@ -172,6 +190,17 @@ bool QFileCopierTest::exists(const QString &folder, const QStringList &list)
     foreach (const QString &file, list) {
         if (!QFileInfo(folder + QLatin1Char('/') + file).exists()) {
 //            qDebug() << folder + QLatin1Char('/') + file;
+            return false;
+        }
+    }
+    return true;
+}
+
+bool QFileCopierTest::checkFiles(const QString &folder, int expectedSize)
+{
+    foreach (const QString &file, files) {
+        QFileInfo info(folder + QLatin1Char('/') + file);
+        if (!info.exists() || info.size() != expectedSize*1024*1024) {
             return false;
         }
     }
