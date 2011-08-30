@@ -6,5 +6,5 @@ DEPENDPATH  *= $$PWD
 SOURCES += qfilecopier.cpp
 
 HEADERS += qfilecopier.h\
-        QFileCopier_global.h \
+        qfilecopier_global.h \
     ../src/qfilecopier_p.h

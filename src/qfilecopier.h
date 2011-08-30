@@ -1,7 +1,7 @@
 #ifndef QFILECOPIER_H
 #define QFILECOPIER_H
 
-#include "QFileCopier_global.h"
+#include "qfilecopier_global.h"
 
 #include <QtCore/QObject>
 
