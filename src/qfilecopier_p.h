@@ -119,7 +119,6 @@ private:
     void overwriteChildren(int id);
 
 private:
-public:
     mutable QReadWriteLock lock;
 
     int m_currentId;
