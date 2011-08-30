@@ -78,6 +78,8 @@ QFileCopier::State QFileCopierThread::state() const
 
 void QFileCopierThread::setState(QFileCopier::State state)
 {
+    QWriteLocker l(&lock);
+
     m_state = state;
     emit stateChanged(m_state);
 }
