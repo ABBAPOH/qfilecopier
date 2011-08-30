@@ -47,8 +47,8 @@ class QFileCopierThread : public QThread
 {
     Q_OBJECT
 
-    typedef QFileCopier::Stage Stage;
-    Q_ENUMS(QFileCopier::Stage)
+    typedef QFileCopier::State State;
+    Q_ENUMS(QFileCopier::State)
 public:
     explicit QFileCopierThread(QObject *parent = 0);
     ~QFileCopierThread();
@@ -57,10 +57,12 @@ public:
 
     QList<int> pendingRequests(int id) const;
 
-    QFileCopier::Stage stage() const;
-    void setStage(QFileCopier::Stage);
+    QFileCopier::State state() const;
+    void setState(QFileCopier::State);
 
     Request request(int id) const;
+
+    int count() const;
 
     qint64 totalProgress() const;
     qint64 totalSize() const;
@@ -91,7 +93,7 @@ protected:
     void restart();
 
 signals:
-    void stageChanged(QFileCopier::Stage);
+    void stateChanged(QFileCopier::State);
     void started(int);
     void finished(int);
     void progress(qint64 progress, qint64 size);
@@ -125,7 +127,7 @@ public:
     QQueue<int> requestQueue;
     QList<Request> requests;
 
-    volatile QFileCopier::Stage m_stage;
+    QFileCopier::State m_state;
     volatile bool shouldEmitProgress;
 
     QWaitCondition waitForFinishedCondition;

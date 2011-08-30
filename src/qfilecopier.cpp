@@ -3,7 +3,7 @@
 #include <QtCore/QCoreApplication>
 #include <QtCore/QMetaType>
 
-Q_DECLARE_METATYPE(QFileCopier::Stage)
+Q_DECLARE_METATYPE(QFileCopier::State)
 Q_DECLARE_METATYPE(QFileCopier::Error)
 
 static bool removePath(const QString &path)
@@ -27,7 +27,7 @@ QFileCopierThread::QFileCopierThread(QObject *parent) :
     QThread(parent),
     lock(QReadWriteLock::Recursive),
     m_currentId(-1),
-    m_stage(QFileCopier::NoStage),
+    m_state(QFileCopier::Idle),
     shouldEmitProgress(false),
     waitingForInteraction(false),
     stopRequest(false),
@@ -71,21 +71,27 @@ QList<int> QFileCopierThread::pendingRequests(int id) const
     return result;
 }
 
-QFileCopier::Stage QFileCopierThread::stage() const
+QFileCopier::State QFileCopierThread::state() const
 {
-    return m_stage;
+    return m_state;
 }
 
-void QFileCopierThread::setStage(QFileCopier::Stage stage)
+void QFileCopierThread::setState(QFileCopier::State state)
 {
-    m_stage = stage;
-    emit stageChanged(m_stage);
+    m_state = state;
+    emit stateChanged(m_state);
 }
 
 Request QFileCopierThread::request(int id) const
 {
     QReadLocker l(&lock);
     return requests.value(id);
+}
+
+int QFileCopierThread::count() const
+{
+    QReadLocker l(&lock);
+    return requests.size();
 }
 
 qint64 QFileCopierThread::totalProgress() const
@@ -269,17 +275,17 @@ void QFileCopierThread::run()
                 }
             } else {
                 lock.unlock();
-                setStage(QFileCopier::Working);
+                setState(QFileCopier::Copying);
                 int id = requestQueue.takeFirst(); // inner queue, no lock
                 handle(id);
                 if (requestQueue.isEmpty()) {
                     emit done(hasError);
                     hasError = false;
-                    setStage(QFileCopier::NoStage);
+                    setState(QFileCopier::Idle);
                 }
             }
         } else {
-            setStage(QFileCopier::Gathering);
+            setState(QFileCopier::Gathering);
             Task t = taskQueue.takeFirst();
             lock.unlock();
 
@@ -729,7 +735,7 @@ void QFileCopierPrivate::enqueueOperation(Task::Type operationType, const QStrin
     }
     thread->enqueueTaskList(taskList);
 
-    setState(QFileCopier::Busy);
+    setState(QFileCopier::Copying);
 }
 
 void QFileCopierPrivate::onStarted(int id)
@@ -767,11 +773,11 @@ QFileCopier::QFileCopier(QObject *parent) :
 {
     Q_D(QFileCopier);
 
-    qRegisterMetaType <QFileCopier::Stage> ("QFileCopier::Stage");
+    qRegisterMetaType <QFileCopier::State> ("QFileCopier::State");
     qRegisterMetaType <QFileCopier::Error> ("QFileCopier::Error");
 
     d->thread = new QFileCopierThread(this);
-    connect(d->thread, SIGNAL(stageChanged(QFileCopier::Stage)), SIGNAL(stageChanged(QFileCopier::Stage)));
+    connect(d->thread, SIGNAL(stageChanged(QFileCopier::State)), SIGNAL(stageChanged(QFileCopier::State)));
     connect(d->thread, SIGNAL(started(int)), d, SLOT(onStarted(int)));
     connect(d->thread, SIGNAL(finished(int)), d, SLOT(onFinished(int)));
     connect(d->thread, SIGNAL(progress(qint64,qint64)), SIGNAL(progress(qint64,qint64)));
@@ -860,6 +866,11 @@ int QFileCopier::currentId() const
     return d_func()->requestStack.top();
 }
 
+int QFileCopier::count() const
+{
+    return d_func()->thread->count();
+}
+
 qint64 QFileCopier::size(int id) const
 {
     return d_func()->thread->request(id).size;
@@ -873,11 +884,6 @@ qint64 QFileCopier::totalProgress() const
 qint64 QFileCopier::totalSize() const
 {
     return d_func()->thread->totalSize();
-}
-
-QFileCopier::Stage QFileCopier::stage() const
-{
-    return d_func()->thread->stage();
 }
 
 QFileCopier::State QFileCopier::state() const

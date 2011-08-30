@@ -18,17 +18,11 @@ public:
 
     enum State {
         Idle,
-        Busy,
+        Gathering,
+        Copying,
         WaitingForInteraction
     };
     Q_ENUMS(State)
-
-    enum Stage {
-        NoStage,
-        Gathering,
-        Working
-    };
-    Q_ENUMS(Stage)
 
     enum CopyFlag {
         NonInteractive = 0x01,
@@ -74,12 +68,12 @@ public:
     bool isDir(int id) const;
     QList<int> entryList(int id) const;
     int currentId() const;
+    int count() const;
     qint64 size(int id) const;
 
     qint64 totalProgress() const;
     qint64 totalSize() const;
 
-    Stage stage() const;
     State state() const;
 
     void setAutoReset(bool on);
@@ -111,7 +105,6 @@ signals:
     void error(QFileCopier::Error error, bool stopped);
 
     void stateChanged(QFileCopier::State);
-    void stageChanged(QFileCopier::Stage);
 
     void done(bool error);
     void started(int id);
