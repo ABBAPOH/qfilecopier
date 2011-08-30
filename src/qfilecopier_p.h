@@ -67,6 +67,8 @@ public:
 
     void setAutoReset(bool on);
 
+    void waitForFinished(unsigned long msecs = ULONG_MAX);
+
     void emitProgress();
 
     void cancel();
@@ -86,6 +88,7 @@ public:
 
 protected:
     void run();
+    void restart();
 
 signals:
     void stageChanged(QFileCopier::Stage);
@@ -114,6 +117,7 @@ private:
     void overwriteChildren(int id);
 
 private:
+public:
     mutable QReadWriteLock lock;
 
     int m_currentId;
@@ -124,6 +128,8 @@ private:
     volatile QFileCopier::Stage m_stage;
     volatile bool shouldEmitProgress;
 
+    QWaitCondition waitForFinishedCondition;
+    QWaitCondition newCopyCondition;
     QWaitCondition interactionCondition;
     bool waitingForInteraction;
 
@@ -158,7 +164,6 @@ public:
 
     void enqueueOperation(Task::Type operationType, const QStringList &sourcePaths,
                           const QString &destinationPath, QFileCopier::CopyFlags flags);
-    void startThread();
 
     void setState(QFileCopier::State s);
 

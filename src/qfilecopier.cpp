@@ -3,8 +3,6 @@
 #include <QtCore/QCoreApplication>
 #include <QtCore/QMetaType>
 
-#include <QDebug>
-
 Q_DECLARE_METATYPE(QFileCopier::Stage)
 Q_DECLARE_METATYPE(QFileCopier::Error)
 
@@ -46,6 +44,9 @@ QFileCopierThread::QFileCopierThread(QObject *parent) :
 QFileCopierThread::~QFileCopierThread()
 {
     // todo: stop operations
+    stopRequest = true;
+    cancel();
+    newCopyCondition.wakeOne();
     wait();
 }
 
@@ -53,6 +54,7 @@ void QFileCopierThread::enqueueTaskList(const QList<Task> &list)
 {
     QWriteLocker l(&lock);
     taskQueue.append(list);
+    restart();
 }
 
 QList<int> QFileCopierThread::pendingRequests(int id) const
@@ -102,6 +104,12 @@ void QFileCopierThread::setAutoReset(bool on)
 {
     QWriteLocker l(&lock);
     autoReset = on;
+}
+
+void QFileCopierThread::waitForFinished(unsigned long msecs)
+{
+    QWriteLocker l(&lock);
+    waitForFinishedCondition.wait(&lock, msecs);
 }
 
 void QFileCopierThread::emitProgress()
@@ -232,42 +240,62 @@ void QFileCopierThread::run()
     bool stop = false;
 
     while (!stop) {
+        lock.lockForWrite();
 
         if (cancelAllRequest) {
+            cancelAllRequest = false;
+            taskQueue.clear();
+            requestQueue.clear();
             emit canceled();
-            break;
+            lock.unlock();
         }
-        lock.lockForWrite();
-        if (!taskQueue.isEmpty()) {
+
+        if (taskQueue.isEmpty()) {
+            if (requestQueue.isEmpty()) {
+                if (stopRequest) {
+                    lock.unlock();
+                    stop = true;
+                } else {
+                    waitForFinishedCondition.wakeOne();
+                    newCopyCondition.wait(&lock);
+                    if (autoReset) {
+                        hasError = false;
+                        overwriteAllRequest = false;
+                        mergeAllRequest = false;
+                        skipAllRequest = false;
+                        skipAllError.clear();
+                    }
+                    lock.unlock();
+                }
+            } else {
+                lock.unlock();
+                setStage(QFileCopier::Working);
+                int id = requestQueue.takeFirst(); // inner queue, no lock
+                handle(id);
+                if (requestQueue.isEmpty()) {
+                    emit done(hasError);
+                    hasError = false;
+                    setStage(QFileCopier::NoStage);
+                }
+            }
+        } else {
             setStage(QFileCopier::Gathering);
             Task t = taskQueue.takeFirst();
             lock.unlock();
 
             createRequest(t);
-        } else {
-            lock.unlock();
-        }
-
-        if (!requestQueue.isEmpty()) {
-            setStage(QFileCopier::Working);
-            int id = requestQueue.takeFirst(); // inner queue, no lock
-            handle(id);
-        } else {
-            stop = true;
         }
     }
+    deleteLater();
+}
 
-    emit done(hasError);
-    hasError = false;
-    setStage(QFileCopier::NoStage);
-
-    if (autoReset) {
-        hasError = false;
-        overwriteAllRequest = false;
-        mergeAllRequest = false;
-        skipAllRequest = false;
-        skipAllError.clear();
+void QFileCopierThread::restart()
+{
+    QWriteLocker l(&lock);
+    if (!isRunning()) {
+        start();
     }
+    newCopyCondition.wakeOne();
 }
 
 void QFileCopierThread::createRequest(Task t)
@@ -683,15 +711,7 @@ void QFileCopierPrivate::enqueueOperation(Task::Type operationType, const QStrin
     }
     thread->enqueueTaskList(taskList);
 
-    startThread();
-}
-
-void QFileCopierPrivate::startThread()
-{
-    if (!thread->isRunning()) {
-        thread->start();
-        setState(QFileCopier::Busy);
-    }
+    setState(QFileCopier::Busy);
 }
 
 void QFileCopierPrivate::onStarted(int id)
@@ -738,7 +758,7 @@ QFileCopier::QFileCopier(QObject *parent) :
     connect(d->thread, SIGNAL(finished(int)), d, SLOT(onFinished(int)));
     connect(d->thread, SIGNAL(progress(qint64,qint64)), SIGNAL(progress(qint64,qint64)));
     connect(d->thread, SIGNAL(error(QFileCopier::Error,bool)), SIGNAL(error(QFileCopier::Error,bool)));
-    connect(d->thread, SIGNAL(finished()), d, SLOT(onThreadFinished()));
+    connect(d->thread, SIGNAL(done(bool)), d, SLOT(onThreadFinished()));
     connect(d->thread, SIGNAL(done(bool)), SIGNAL(done(bool)));
     d->state = Idle;
 
@@ -885,7 +905,7 @@ void QFileCopier::setProgressInterval(int ms)
 
 void QFileCopier::waitForFinished(unsigned long msecs)
 {
-    d_func()->thread->wait(msecs);
+    d_func()->thread->waitForFinished(msecs);
 }
 
 void QFileCopier::cancelAll()
