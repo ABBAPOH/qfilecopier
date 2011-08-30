@@ -479,7 +479,21 @@ bool QFileCopierThread::createDir(const Request &r, QFileCopier::Error *err)
 
 bool QFileCopierThread::copyFile(const Request &r, QFileCopier::Error *err)
 {
-    QFile sourceFile(r.source);
+    QString source = r.source;
+    QFileInfo sourceInfo(source);
+
+    if (sourceInfo.isSymLink()) {
+        source = sourceInfo.symLinkTarget();
+        if (!(r.copyFlags & QFileCopier::FollowLinks)) {
+            if (!QFile::link(source, r.dest)) {
+                *err = QFileCopier::CannotCreateSymLink;
+                return false;
+            }
+            return true;
+        }
+    }
+
+    QFile sourceFile(source);
     if (!sourceFile.open(QFile::ReadOnly)) {
         *err = QFileCopier::CannotOpenSourceFile;
         return false;
@@ -620,7 +634,11 @@ bool QFileCopierThread::remove(const Request &r, QFileCopier::Error *err)
         result = QDir().rmdir(r.source);
 
     } else {
-        result = QFile::remove(r.source);
+        QFileInfo sourceInfo(r.source);
+        if (sourceInfo.isSymLink() && (r.copyFlags & QFileCopier::FollowLinks)) {
+            result &= QFile::remove(sourceInfo.symLinkTarget());
+        }
+        result &= QFile::remove(r.source);
     }
 
     if (!result) {
