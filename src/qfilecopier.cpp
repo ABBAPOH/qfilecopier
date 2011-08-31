@@ -793,7 +793,7 @@ QFileCopier::QFileCopier(QObject *parent) :
     connect(d->thread, SIGNAL(started(int)), d, SLOT(onStarted(int)));
     connect(d->thread, SIGNAL(finished(int)), d, SLOT(onFinished(int)));
     connect(d->thread, SIGNAL(progress(qint64,qint64)), SIGNAL(progress(qint64,qint64)));
-    connect(d->thread, SIGNAL(error(QFileCopier::Error,bool)), SIGNAL(error(QFileCopier::Error,bool)));
+    connect(d->thread, SIGNAL(error(int, QFileCopier::Error,bool)), SIGNAL(error(int, QFileCopier::Error,bool)));
     connect(d->thread, SIGNAL(done(bool)), d, SLOT(onThreadFinished()));
     connect(d->thread, SIGNAL(done(bool)), SIGNAL(done(bool)));
     d->state = Idle;
