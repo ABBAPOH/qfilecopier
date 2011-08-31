@@ -40,7 +40,6 @@ public:
 
 public slots:
     void onStateChanged(QFileCopier::State);
-    void onStageChanged(QFileCopier::Stage);
 
     void onStarted(int);
     void onFinished(int);
@@ -126,12 +125,6 @@ void NotificationTest::onStateChanged(QFileCopier::State s)
         cleanTest();
         qApp->quit();
     }
-}
-
-void NotificationTest::onStageChanged(QFileCopier::Stage s)
-{
-    Q_ASSERT_X(QThread::currentThread() == qApp->thread(), "NotificationTest::onStateChanged", "slot invoked from wrong thread");
-    qDebug() << "  Stage changed" << s;
 }
 
 void NotificationTest::onStarted(int id)
