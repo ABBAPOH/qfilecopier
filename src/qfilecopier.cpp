@@ -789,7 +789,7 @@ QFileCopier::QFileCopier(QObject *parent) :
     qRegisterMetaType <QFileCopier::Error> ("QFileCopier::Error");
 
     d->thread = new QFileCopierThread(this);
-    connect(d->thread, SIGNAL(stageChanged(QFileCopier::State)), SIGNAL(stageChanged(QFileCopier::State)));
+    connect(d->thread, SIGNAL(stateChanged(QFileCopier::State)), SIGNAL(stateChanged(QFileCopier::State)));
     connect(d->thread, SIGNAL(started(int)), d, SLOT(onStarted(int)));
     connect(d->thread, SIGNAL(finished(int)), d, SLOT(onFinished(int)));
     connect(d->thread, SIGNAL(progress(qint64,qint64)), SIGNAL(progress(qint64,qint64)));
