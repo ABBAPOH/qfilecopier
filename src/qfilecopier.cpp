@@ -535,6 +535,11 @@ bool QFileCopierThread::copyFile(const Request &r, QFileCopier::Error *err)
     qint64 lenRead = 0;
     do {
 
+        if (r.canceled || cancelAllRequest) {
+            *err = QFileCopier::Canceled;
+            return false;
+        }
+
         lenRead = sourceFile.read(buffer.data(), bufferSize);
         if (lenRead != 0) {
 
