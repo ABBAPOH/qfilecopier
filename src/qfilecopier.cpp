@@ -71,6 +71,12 @@ QList<int> QFileCopierThread::pendingRequests(int id) const
     return result;
 }
 
+QList<int> QFileCopierThread::topRequests() const
+{
+    QReadLocker l(&lock);
+    return topRequestsList;
+}
+
 QFileCopier::State QFileCopierThread::state() const
 {
     return m_state;
@@ -254,6 +260,7 @@ void QFileCopierThread::run()
             cancelAllRequest = false;
             taskQueue.clear();
             requestQueue.clear();
+            topRequestsList.clear();
             emit canceled();
             lock.unlock();
         }
@@ -272,6 +279,7 @@ void QFileCopierThread::run()
                         mergeAllRequest = false;
                         skipAllRequest = false;
                         skipAllError.clear();
+                        topRequestsList.clear();
                     }
                     lock.unlock();
                 }
@@ -331,8 +339,10 @@ void QFileCopierThread::createRequest(Task t)
 #endif
 
     int index = addRequestToQueue(Request(t));
-    if (index != -1)
+    if (index != -1) {
         requestQueue.append(index);
+        topRequestsList.append(index);
+    }
 }
 
 bool QFileCopierThread::shouldOverwrite(const Request &r)
@@ -841,6 +851,11 @@ void QFileCopier::remove(const QStringList &paths, CopyFlags flags)
 QList<int> QFileCopier::pendingRequests() const
 {
     return d_func()->thread->pendingRequests(currentId());
+}
+
+QList<int> QFileCopier::topRequests() const
+{
+    return d_func()->thread->topRequests();
 }
 
 QString QFileCopier::sourceFilePath(int id) const

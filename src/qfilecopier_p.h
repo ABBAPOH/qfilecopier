@@ -56,6 +56,7 @@ public:
     void enqueueTaskList(const QList<Task> &list);
 
     QList<int> pendingRequests(int id) const;
+    QList<int> topRequests() const;
 
     QFileCopier::State state() const;
     void setState(QFileCopier::State);
@@ -124,6 +125,7 @@ private:
     int m_currentId;
     QQueue<Task> taskQueue;
     QQueue<int> requestQueue;
+    QList<int> topRequestsList;
     QList<Request> requests;
 
     QFileCopier::State m_state;
