@@ -379,7 +379,7 @@ bool QFileCopierThread::checkRequest(int id)
             done = true;
         }
 
-        done = interact(r, done, err);
+        done = interact(id, r, done, err);
     }
 
     lock.lockForWrite();
@@ -443,20 +443,20 @@ int QFileCopierThread::addRequestToQueue(Request request)
     return id;
 }
 
-bool QFileCopierThread::interact(const Request &r, bool done, QFileCopier::Error err)
+bool QFileCopierThread::interact(int id, const Request &r, bool done, QFileCopier::Error err)
 {
     if (done || (r.copyFlags & QFileCopier::NonInteractive)) {
         done = true;
         if (err != QFileCopier::NoError)
-            emit error(err, false);
+            emit error(id, err, false);
     } else {
         lock.lockForWrite();
         if (stopRequest || skipAllError.contains(err)) {
             done = true;
             if (!stopRequest)
-                emit error(err, false);
+                emit error(id, err, false);
         } else {
-            emit error(err, true);
+            emit error(id, err, true);
             waitingForInteraction = true;
             interactionCondition.wait(&lock);
             if (skipAllRequest) {
@@ -719,7 +719,7 @@ void QFileCopierThread::handle(int id)
     while (!done) {
         Request r = request(id);
         done = processRequest(r, &err);
-        done = interact(r, done, err);
+        done = interact(id, r, done, err);
     }
 
     if (err != QFileCopier::NoError)

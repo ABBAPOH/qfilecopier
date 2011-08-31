@@ -98,7 +98,7 @@ signals:
     void started(int);
     void finished(int);
     void progress(qint64 progress, qint64 size);
-    void error(QFileCopier::Error error, bool stopped);
+    void error(int id, QFileCopier::Error error, bool stopped);
     void done(bool error);
     void canceled();
 
@@ -108,7 +108,7 @@ private:
     bool shouldMerge(const Request &r);
     bool checkRequest(int id);
     int addRequestToQueue(Request r);
-    bool interact(const Request &r, bool done, QFileCopier::Error err);
+    bool interact(int id, const Request &r, bool done, QFileCopier::Error err);
     bool createDir(const Request &r, QFileCopier::Error *err);
     bool copyFile(const Request &r, QFileCopier::Error *err);
     bool copy(const Request &, QFileCopier::Error *);

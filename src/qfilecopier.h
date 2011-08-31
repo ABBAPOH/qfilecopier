@@ -103,7 +103,7 @@ public slots:
     void mergeAll();
 
 signals:
-    void error(QFileCopier::Error error, bool stopped);
+    void error(int id, QFileCopier::Error error, bool stopped);
 
     void stateChanged(QFileCopier::State);
 

@@ -46,7 +46,7 @@ public slots:
     void onFinished(int);
     void onProgress(qint64, qint64);
 
-    void onError(QFileCopier::Error error, bool stopped);
+    void onError(int id, QFileCopier::Error error, bool stopped);
 
 private:
     QString tempFolder;
@@ -76,7 +76,7 @@ void NotificationTest::initTest()
     connect(&copier, SIGNAL(finished(int,bool)), SLOT(onFinished(int)));
     connect(&copier, SIGNAL(progress(qint64,qint64)), SLOT(onProgress(qint64,qint64)));
 
-    connect(&copier, SIGNAL(error(QFileCopier::Error,bool)), SLOT(onError(QFileCopier::Error,bool)));
+    connect(&copier, SIGNAL(error(int, QFileCopier::Error,bool)), SLOT(onError(int, QFileCopier::Error,bool)));
 }
 
 void NotificationTest::testCopy()
@@ -155,7 +155,7 @@ void NotificationTest::onProgress(qint64 w, qint64 s)
     qDebug() << QString("      Total progress %1 / %2 (%3)").arg(copier.totalProgress()/1024).arg(copier.totalSize()/1024).arg(100*copier.totalProgress()/copier.totalSize()).toLatin1().data();
 }
 
-void NotificationTest::onError(QFileCopier::Error error, bool stopped)
+void NotificationTest::onError(int id, QFileCopier::Error error, bool stopped)
 {
     Q_ASSERT_X(QThread::currentThread() == qApp->thread(), "NotificationTest::onProgress", "slot invoked from wrong thread");
     qDebug() << "      Error occured for request" << copier.currentId() << error << "stopped ="<< stopped;
