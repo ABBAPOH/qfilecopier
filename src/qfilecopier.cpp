@@ -880,7 +880,11 @@ QList<int> QFileCopier::entryList(int id) const
 
 int QFileCopier::currentId() const
 {
-    return d_func()->requestStack.top();
+    Q_D(const QFileCopier);
+    if (d->requestStack.isEmpty())
+        return -1;
+
+    return d->requestStack.top();
 }
 
 int QFileCopier::count() const
