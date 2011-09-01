@@ -373,7 +373,7 @@ bool QFileCopierThread::checkRequest(int id)
             err = QFileCopier::Canceled;
         } else if (!QFileInfo(r.source).exists()) {
             err = QFileCopier::SourceNotExists;
-        } else if (!shouldOverwrite(r) && shouldMerge(r) && QFileInfo(r.dest).exists()) {
+        } else if (!shouldOverwrite(r) && !shouldMerge(r) && QFileInfo(r.dest).exists()) {
             err = QFileCopier::DestinationExists;
         } else {
             done = true;
