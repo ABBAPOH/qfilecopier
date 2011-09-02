@@ -33,6 +33,7 @@ QFileCopierThread::QFileCopierThread(QObject *parent) :
     stopRequest(false),
     skipAllRequest(false),
     cancelAllRequest(false),
+    overwriteAllRequest(false),
     mergeAllRequest(false),
     hasError(true),
     m_totalProgress(0),
@@ -402,14 +403,20 @@ int QFileCopierThread::addRequestToQueue(Request request)
     if (!checkRequest(id))
         return -1;
 
+    {
+        QWriteLocker l(&lock);
+        request = requests[id]; // refresh request
+    }
+
     QFileInfo sourceInfo(request.source);
     request.isDir = sourceInfo.isDir();
     request.size = request.isDir ? 0 : sourceInfo.size();
 
     {
         QWriteLocker l(&lock);
+
         m_totalSize += request.size;
-        requests[id] = request; // refresh request
+        requests[id] = request; // update request
     }
 
     if (request.isDir) {
