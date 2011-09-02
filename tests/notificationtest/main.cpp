@@ -62,7 +62,7 @@ void NotificationTest::initTest()
     d.mkdir("folder1");
     QFile f(tempFolder + "/folder1/" + "file.bin");
     f.open(QFile::WriteOnly);
-    QByteArray arr(1024, 0xfe);
+    QByteArray arr(1024, (char)0xfe);
     for (int i = 0; i < 100*1024; i++) {
         f.write(arr);
     }
@@ -148,7 +148,7 @@ void NotificationTest::onProgress(qint64 w, qint64 s)
     qDebug() << QString("      Total progress %1 / %2 (%3)").arg(copier.totalProgress()/1024).arg(copier.totalSize()/1024).arg(100*copier.totalProgress()/copier.totalSize()).toLatin1().data();
 }
 
-void NotificationTest::onError(int id, QFileCopier::Error error, bool stopped)
+void NotificationTest::onError(int /*id*/, QFileCopier::Error error, bool stopped)
 {
     Q_ASSERT_X(QThread::currentThread() == qApp->thread(), "NotificationTest::onProgress", "slot invoked from wrong thread");
     qDebug() << "      Error occured for request" << copier.currentId() << error << "stopped ="<< stopped;

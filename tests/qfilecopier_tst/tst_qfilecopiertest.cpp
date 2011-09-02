@@ -172,7 +172,7 @@ void QFileCopierTest::createFiles(const QString &folder, int mb)
     foreach (const QString &file, files) {
         QFile f(folder + QLatin1Char('/') + file);
         QVERIFY2(f.open(QFile::WriteOnly), "Can't open file");
-        QByteArray arr(4*1024, 0xfe);
+        QByteArray arr(4*1024, (char)0xfe);
         for (int i = 0; i < mb*1024/4; i++) {
             f.write(arr);
         }
