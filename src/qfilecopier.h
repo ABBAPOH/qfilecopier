@@ -27,10 +27,11 @@ public:
     enum CopyFlag {
         NonInteractive = 0x01,
         Force = 0x02,
-//        CancelOnError = 0x04,
+        //        CancelOnError = 0x04,
         FollowLinks = 0x08, // if not set links are copied
         CopyOnMove = 0x10
     };
+    Q_DECLARE_FLAGS(CopyFlags, CopyFlag)
 
     enum Error {
         NoError,
@@ -48,8 +49,7 @@ public:
         CannotRename,
         Canceled
     };
-
-    Q_DECLARE_FLAGS(CopyFlags, CopyFlag)
+    Q_ENUMS(Error)
 
     void copy(const QString &sourcePath, const QString &destinationPath, CopyFlags flags = 0);
     void copy(const QStringList &sourcePaths, const QString &destinationPath, CopyFlags flags = 0);
