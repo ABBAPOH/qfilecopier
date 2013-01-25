@@ -92,7 +92,8 @@ void QFileCopierTest::testCopy1()
 
 void QFileCopierTest::testCopy2()
 {
-    copier.copy(sourceFolder, destFolder + "/");
+    QDir().mkpath(destFolder);
+    copier.copy(sourceFolder, destFolder);
     copier.waitForFinished();
 
     QVERIFY2(exists(destFolder + "/" + sourceFolder), "Files were not copied");
@@ -135,7 +136,8 @@ void QFileCopierTest::testMove1()
 
 void QFileCopierTest::testMove2()
 {
-    copier.move(sourceFolder, destFolder + "/");
+    QDir().mkpath(destFolder);
+    copier.move(sourceFolder, destFolder);
     copier.waitForFinished();
 
     QVERIFY2(exists(destFolder + "/" + sourceFolder) && !exists(sourceFolder), "Files were not moved");
